@@ -143,7 +143,7 @@
                 <div><span class="font-extrabold">🏃 Move:</span> WASD / Arrows / Drag</div>
                 <div><span class="font-extrabold">✨ Interact:</span> E / Space / Tap Btn</div>
                 <div><span class="font-extrabold">🎥 Camera:</span> Drag / Scroll / Q &amp; E</div>
-                <div><span class="font-extrabold">📜 Quests:</span> Plaza Bulletin Board</div>
+                <div><span class="font-extrabold">🗺️ Map &amp; Compass:</span> [M] or Click Radar</div>
             </div>
             <button id="start-btn" class="cozy-btn w-full py-3.5 px-6 text-lg font-cozy font-bold text-[#5C3A2E] bg-[#FCD581] border-[#D49A3A] shadow-[0_5px_0_#D49A3A] hover:bg-[#FDE09B]">
                 🌻 Step Onto The Island
@@ -201,6 +201,24 @@
                 <div class="flex items-center justify-between pt-1 border-t border-[#E6CCB2] text-xs font-extrabold text-[#6F4538]">
                     <span>🪙 Sunbeam Coins</span>
                     <span id="coins-label" class="tabular-nums text-amber-800">30</span>
+                </div>
+            </div>
+
+            <!-- Center: Live Rotating Compass & Active Region -->
+            <div id="compass-panel" class="cozy-panel pointer-events-auto px-3 py-2 flex flex-col items-center gap-1 min-w-[210px] sm:min-w-[270px] max-w-[320px] order-last lg:order-none mx-auto">
+                <div class="flex items-center justify-between w-full gap-2 text-[11px] font-extrabold text-[#6F4538]">
+                    <span id="compass-region" class="truncate max-w-[145px]">🏝️ Sunbeam Village</span>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <span id="compass-heading" class="font-mono tabular-nums text-amber-800">N 000°</span>
+                        <button id="map-open-btn" title="Open Full Island Map [M]" class="cozy-btn px-2 py-0.5 text-[11px] font-cozy font-bold bg-[#FCD581] border-[#C88A2E] text-[#5C3A2E] whitespace-nowrap">
+                            🗺️ Map
+                        </button>
+                    </div>
+                </div>
+                <div id="compass-window" title="Live Island Compass — Click to open Map" class="relative w-full h-6 bg-[#F7EDE2] border-2 border-[#D4A373] rounded-xl overflow-hidden cursor-pointer select-none">
+                    <div id="compass-tape" class="absolute top-0 left-0 h-full will-change-transform"></div>
+                    <div class="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-[#E07A5F] z-10 pointer-events-none"></div>
+                    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-r-[5px] border-t-[6px] border-l-transparent border-r-transparent border-t-[#E07A5F] z-10 pointer-events-none"></div>
                 </div>
             </div>
 
@@ -289,8 +307,65 @@
                     </button>
                 </div>
 
-                <!-- Spacer for mobile symmetry -->
-                <div class="sm:hidden w-12"></div>
+                <!-- Bottom-Right: Live Circular Minimap Radar + Expand Map -->
+                <div class="pointer-events-auto flex flex-col items-end gap-1.5 shrink-0 sm:fixed sm:bottom-4 sm:right-4 z-20">
+                    <div id="minimap-wrap" class="cozy-panel p-1.5 rounded-full relative shadow-lg cursor-pointer group" title="Click or press [M] to open Island Map">
+                        <canvas id="minimap-canvas" width="112" height="112" class="w-[92px] h-[92px] sm:w-[112px] sm:h-[112px] rounded-full block border-2 border-[#D4A373] bg-[#5BB5D5]"></canvas>
+                        <span class="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 px-1.5 py-0 rounded-full bg-[#E07A5F] text-white text-[9px] font-extrabold leading-tight shadow">N</span>
+                        <span class="pointer-events-none absolute bottom-1 right-1 px-1.5 py-0.5 rounded-full bg-[#FFF9F0]/95 border border-[#D4A373] text-[9px] font-extrabold text-[#5C3A2E] shadow-sm">🗺️ M</span>
+                    </div>
+                    <button id="minimap-toggle-btn" class="cozy-btn px-2 py-0.5 text-[10px] font-bold text-[#6F4538]" title="Toggle Minimap">
+                        Hide Radar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactive Full Island Map Modal -->
+    <div id="map-modal" class="fixed inset-0 z-40 hidden items-center justify-center p-3 sm:p-5 bg-black/35 backdrop-blur-xs">
+        <div class="cozy-panel max-w-4xl w-full p-4 sm:p-6 animate-pop max-h-[92vh] flex flex-col gap-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <h2 class="font-cozy font-bold text-xl sm:text-2xl text-[#5C3A2E]">🗺️ Sunbeam Cove Archipelago Map</h2>
+                    <p id="map-subtitle" class="text-xs font-bold text-[#8D6B5D]">Click anywhere on the island to drop a 📍 Compass Waypoint Beacon, or Fast Travel to discovered regions!</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="clear-waypoint-btn" class="cozy-btn px-3 py-1.5 text-xs font-cozy font-bold text-[#6F4538] hidden">
+                        ✕ Clear Pin
+                    </button>
+                    <button id="close-map-btn" class="cozy-btn w-9 h-9 font-bold text-[#5C3A2E]">✕</button>
+                </div>
+            </div>
+
+            <!-- Interactive Filter Tabs -->
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex flex-wrap items-center gap-1.5" id="map-filter-tabs">
+                    <button data-map-filter="all" class="map-filter-btn cozy-btn active px-3 py-1 text-xs font-cozy font-bold text-[#5C3A2E]">All Pins</button>
+                    <button data-map-filter="landmarks" class="map-filter-btn cozy-btn px-3 py-1 text-xs font-cozy font-bold text-[#5C3A2E]">Regions &amp; Homes</button>
+                    <button data-map-filter="activities" class="map-filter-btn cozy-btn px-3 py-1 text-xs font-cozy font-bold text-[#5C3A2E]">Activities &amp; Loot</button>
+                    <button data-map-filter="villagers" class="map-filter-btn cozy-btn px-3 py-1 text-xs font-cozy font-bold text-[#5C3A2E]">Neighbors</button>
+                </div>
+                <div id="map-coords-readout" class="text-xs font-mono tabular-nums font-bold text-[#8D6B5D]">
+                    Position: (0, 0) · Sunbeam Village
+                </div>
+            </div>
+
+            <!-- Two-Column Map Canvas + Region Directory -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-hidden flex-1 min-h-0">
+                <div class="lg:col-span-7 flex items-center justify-center bg-[#5EBAD9] rounded-2xl border-[3px] border-[#D4A373] p-2 relative overflow-hidden">
+                    <canvas id="fullmap-canvas" width="540" height="540" class="w-full max-w-[460px] aspect-square rounded-xl cursor-crosshair shadow-inner"></canvas>
+                </div>
+                <div class="lg:col-span-5 flex flex-col gap-2 overflow-y-auto pr-1 max-h-[340px] lg:max-h-[460px]">
+                    <div class="font-cozy font-bold text-sm text-[#5C3A2E]">🧭 Island Regions &amp; Fast Travel</div>
+                    <div id="map-regions-list" class="space-y-2">
+                        <!-- Populated dynamically -->
+                    </div>
+                    <div class="font-cozy font-bold text-sm text-[#5C3A2E] pt-1">📍 Live Neighbor Tracker</div>
+                    <div id="map-villagers-mini" class="space-y-1.5 text-xs">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -425,6 +500,26 @@
                     </div>
                     <button id="cook-broth-btn" class="cozy-btn px-3.5 py-2 text-xs font-cozy font-bold bg-[#FCD581] border-[#D49A3A]">
                         🍳 Simmer
+                    </button>
+                </div>
+                <div class="bg-[#F7EDE2] border-2 border-[#E6CCB2] rounded-2xl p-3 flex items-center justify-between gap-3">
+                    <div>
+                        <div class="font-cozy font-bold text-base text-[#5C3A2E]">🍏 Honey Apple Crisp</div>
+                        <div class="text-xs text-[#7F5548]">Restores +85 ⚡ &amp; +22 💖 coziness!</div>
+                        <div class="text-xs font-extrabold text-amber-800 mt-1">Requires: 2 🍎 Orchard Apples + 1 🍯 Honey</div>
+                    </div>
+                    <button id="bake-crisp-btn" class="cozy-btn px-3.5 py-2 text-xs font-cozy font-bold bg-[#FFE8CC] border-[#E76F51]">
+                        🍏 Bake
+                    </button>
+                </div>
+                <div class="bg-[#F7EDE2] border-2 border-[#E6CCB2] rounded-2xl p-3 flex items-center justify-between gap-3">
+                    <div>
+                        <div class="font-cozy font-bold text-base text-[#5C3A2E]">🍄 Woodland Mushroom Soup</div>
+                        <div class="text-xs text-[#7F5548]">Restores +75 ⚡ &amp; +18 💖 coziness!</div>
+                        <div class="text-xs font-extrabold text-emerald-800 mt-1">Requires: 2 🍄 Mushrooms + 1 🌸 Flower</div>
+                    </div>
+                    <button id="cook-soup-btn" class="cozy-btn px-3.5 py-2 text-xs font-cozy font-bold bg-[#D8F3DC] border-[#52B788]">
+                        🍲 Simmer
                     </button>
                 </div>
             </div>
@@ -901,6 +996,9 @@
             strawberries: 0,
             pumpkins: 0,
             wheat: 0,
+            apples: 0,
+            honey: 0,
+            mushrooms: 0,
             wood: 2,
             flowers: 1,
             fish: 0,
@@ -911,8 +1009,15 @@
             fireflies: 0,
             tea: 0,
             pie: 0,
-            shortcake: 0
+            shortcake: 0,
+            crisp: 0,
+            soup: 0
         },
+        discoveredRegions: ['village'],
+        waypoint: null,
+        mapFilter: 'all',
+        minimapVisible: true,
+        telescopeUsedDay: 0,
         npcs: {
             barnaby: {
                 id: 'barnaby',
@@ -991,9 +1096,11 @@
             { id: 'enter_house', text: 'Step inside your Red-Roof Cottage', current: 0, target: 1, done: false },
             { id: 'visit_neighbor_home', text: 'Visit a neighbor inside their home', current: 0, target: 1, done: false },
             { id: 'water_flowers', text: 'Harvest 2 garden crops or flowers', current: 0, target: 2, done: false },
-            { id: 'catch_fish', text: 'Catch a fish at the wooden pier', current: 0, target: 1, done: false },
+            { id: 'catch_fish', text: 'Catch a fish at any wooden pier', current: 0, target: 1, done: false },
             { id: 'gift_neighbor', text: 'Share a gift with any neighbor', current: 0, target: 1, done: false },
-            { id: 'craft_decor', text: 'Craft 1 tool or decor item', current: 0, target: 1, done: false }
+            { id: 'craft_decor', text: 'Craft 1 tool or decor item', current: 0, target: 1, done: false },
+            { id: 'explore_regions', text: 'Discover 3 outer island regions', current: 0, target: 3, done: false },
+            { id: 'find_treasure', text: 'Dig beach treasure or wish at well', current: 0, target: 1, done: false }
         ],
         bulletinRequests: [],
         unlockedBlueprints: [],
@@ -1190,12 +1297,13 @@
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xAEE2FF);
-    scene.fog = new THREE.FogExp2(0xC9ECFF, 0.013);
+    scene.fog = new THREE.FogExp2(0xC9ECFF, 0.0082);
 
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 160);
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 240);
     let cameraAngle = Math.PI * 0.25;
     let cameraPitch = 0.62;
     let cameraDist = 16.0;
+    let currentGroundY = 0.4;
 
     // Warm Stylized Lighting
     const hemiLight = new THREE.HemisphereLight(0xFFF6E5, 0x7FB069, 0.85);
@@ -1207,14 +1315,15 @@
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.camera.near = 2;
-    sunLight.shadow.camera.far = 75;
-    const d = 26;
+    sunLight.shadow.camera.far = 90;
+    const d = 28;
     sunLight.shadow.camera.left = -d;
     sunLight.shadow.camera.right = d;
     sunLight.shadow.camera.top = d;
     sunLight.shadow.camera.bottom = -d;
     sunLight.shadow.bias = -0.0005;
     scene.add(sunLight);
+    scene.add(sunLight.target);
 
     // Pre-allocated math helpers for zero-GC animation loop
     const _camTargetVec = new THREE.Vector3();
@@ -1285,10 +1394,10 @@
     }
 
     // ----------------------------------------------------------------------------
-    // 4A. EXPANDED SUNBEAM VILLAGE ISLAND TERRAIN & PATHS
+    // 4A. HUGE ARCHIPELAGO ISLAND TERRAIN, BIOME REGIONS & TRAILS
     // ----------------------------------------------------------------------------
     const ocean = new THREE.Mesh(
-        new THREE.CircleGeometry(110, 48),
+        new THREE.CircleGeometry(210, 64),
         new THREE.MeshStandardMaterial({
             color: 0x6EC6E6,
             roughness: 0.25,
@@ -1301,16 +1410,32 @@
     ocean.position.y = -0.55;
     outdoorWorld.add(ocean);
 
-    // Expanded Island Radius (20.5 sand, 18.8 grass) to comfortably fit 4 houses & village square
-    const sandBase = new THREE.Mesh(new THREE.CylinderGeometry(20.5, 22.0, 0.9, 44), mat(0xF6E2B3, 0.95));
+    // Huge Island Radius (46.0 sand shoreline, 42.5 lush meadow) hosting 6 distinct regions!
+    const sandBase = new THREE.Mesh(new THREE.CylinderGeometry(46.0, 48.5, 0.9, 64), mat(0xF6E2B3, 0.95));
     sandBase.position.y = -0.35;
     sandBase.receiveShadow = true;
     outdoorWorld.add(sandBase);
 
-    const grassTop = new THREE.Mesh(new THREE.CylinderGeometry(18.8, 20.0, 0.7, 44), mat(0x95D58B, 0.9));
+    const grassTop = new THREE.Mesh(new THREE.CylinderGeometry(42.5, 44.2, 0.7, 64), mat(0x95D58B, 0.9));
     grassTop.position.y = 0.05;
     grassTop.receiveShadow = true;
     outdoorWorld.add(grassTop);
+
+    // Distinct Biome Ground Accents (Pine Woods Floor, Sunlit Orchard Meadow, Cliff Stone, Hot Spring Deck)
+    const pineFloor = new THREE.Mesh(new THREE.CylinderGeometry(12.5, 13.0, 0.06, 24), mat(0x6BA368, 0.95));
+    pineFloor.position.set(-24.5, 0.39, -22.0);
+    pineFloor.receiveShadow = true;
+    outdoorWorld.add(pineFloor);
+
+    const orchardFloor = new THREE.Mesh(new THREE.CylinderGeometry(12.0, 12.5, 0.06, 24), mat(0xB5E48C, 0.92));
+    orchardFloor.position.set(24.0, 0.39, -19.0);
+    orchardFloor.receiveShadow = true;
+    outdoorWorld.add(orchardFloor);
+
+    const cliffTerrace = new THREE.Mesh(new THREE.CylinderGeometry(6.2, 7.0, 0.34, 16), mat(0xC9C2BA, 0.92));
+    cliffTerrace.position.set(-26.0, 0.52, 23.0);
+    cliffTerrace.receiveShadow = true;
+    outdoorWorld.add(cliffTerrace);
 
     // Central Cozy Village Plaza Circle
     const plaza = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.6, 0.08, 28), mat(0xEDE0D4, 0.92));
@@ -1318,18 +1443,28 @@
     plaza.receiveShadow = true;
     outdoorWorld.add(plaza);
 
-    // Winding Cobblestone Paths connecting all 4 houses, garden, and pier
+    // Winding Cobblestone Paths connecting Village Houses + all Outer Regions
     const stonePositions = [
         // To Player's Red Cottage (North-West)
         [-1.8, -1.5], [-3.0, -2.7], [-4.2, -3.9], [-5.2, -5.0],
+        // Extended Trail -> Whispering Pine Woods & Wishing Well (NW)
+        [-8.8, -9.2], [-11.2, -11.4], [-13.8, -13.6], [-16.6, -15.8], [-19.4, -18.2], [-22.0, -20.2],
         // To Pip's Mint Bakery (East)
         [2.5, 0.2], [4.2, -0.3], [5.9, -0.8], [7.5, -1.2],
+        // Extended Trail -> Coastal Hot Spring (East)
+        [13.4, -0.8], [16.6, -0.2], [19.8, 0.5], [23.0, 1.1], [26.2, 1.7],
         // To Clover's Lavender Cabin (West)
         [-2.8, 1.2], [-4.6, 1.8], [-6.4, 2.3], [-8.0, 2.6],
+        // Extended Trail -> Lighthouse Cliff (SW)
+        [-10.8, 5.5], [-13.2, 8.2], [-15.8, 11.2], [-18.4, 14.2], [-20.8, 17.0], [-23.0, 19.6],
         // To Captain Barnaby's Boathouse & Pier (South-East)
         [1.8, 2.6], [3.3, 4.1], [4.8, 5.6], [6.4, 7.1], [7.9, 8.5],
+        // Extended Harbor Boardwalk Trail -> Coral Harbor Dock (SE)
+        [15.0, 15.0], [17.5, 17.5], [20.0, 20.0], [22.4, 22.4],
         // To Garden Patch (North-East)
-        [0.4, -2.2], [0.8, -3.8], [1.0, -5.2]
+        [0.4, -2.2], [0.8, -3.8], [1.0, -5.2],
+        // Extended Trail -> Sunlit Orchard & Apiary (NE)
+        [5.8, -6.2], [8.6, -8.2], [11.6, -10.4], [14.8, -12.6], [18.0, -14.8], [21.2, -17.0]
     ];
     stonePositions.forEach(([sx, sz], i) => {
         const stone = new THREE.Mesh(
@@ -1344,22 +1479,26 @@
 
     function getGroundSurface(x, z, zone) {
         if (zone !== 'outdoor') return 'wood';
-        // Wooden Pier (South-East)
+        // Village Wooden Pier & Outer Coral Harbor Dock (South-East)
         if (x > 9.5 && z > 9.5 && Math.abs(x - z) < 1.8 && (x + z) < 27.0) return 'wood';
+        if (x > 22.0 && z > 22.0 && Math.abs(x - z) < 2.6 && (x + z) < 57.5) return 'wood';
+        // Lighthouse Stone Cliff Plateau (South-West)
+        if (Math.hypot(x + 26.0, z - 23.0) <= 6.2) return 'cobblestone';
         // Central Plaza & Stepping Stone Cobblestone Paths
         if (Math.hypot(x, z - 0.5) <= 3.6) return 'cobblestone';
         for (let i = 0; i < stonePositions.length; i++) {
             const dx = x - stonePositions[i][0];
             const dz = z - stonePositions[i][1];
-            if (dx * dx + dz * dz <= 0.88 * 0.88) return 'cobblestone';
+            if (dx * dx + dz * dz <= 0.92 * 0.92) return 'cobblestone';
         }
-        // Dirt terrain around Garden Beds, Workbench & Cottage Thresholds
+        // Dirt terrain around Garden Beds, Workbench, Wishing Well, Apiary & Cottage Thresholds
         if (x >= -2.5 && x <= 4.7 && z >= -8.8 && z <= -5.0) return 'dirt';
         if (Math.hypot(x + 10.2, z + 4.4) <= 1.75) return 'dirt';
+        if (Math.hypot(x + 25.5, z + 22.5) <= 3.2 || Math.hypot(x - 25.5, z + 18.5) <= 2.8) return 'dirt';
         if (Math.hypot(x + 5.8, z + 5.2) <= 1.25 || Math.hypot(x - 8.5, z + 1.7) <= 1.25 ||
             Math.hypot(x + 8.6, z - 3.0) <= 1.25 || Math.hypot(x - 5.6, z - 8.6) <= 1.25) return 'dirt';
         // Sandy Beach Shoreline
-        if (Math.hypot(x, z) > 15.8) return 'beach';
+        if (Math.hypot(x, z) > 41.2) return 'beach';
         return 'grass';
     }
 
@@ -2458,17 +2597,18 @@
     }
     buildGarden();
 
-    // Beach Shellfish Spawns along Sandy Perimeter
+    // Beach Shellfish Spawns along Expanded Outer Sandy Perimeter (r ~ 41.5 - 43.2)
     function spawnBeachShellfish() {
         const shellSpots = [
-            [17.8, 3.2], [15.5, -10.2], [-15.2, 10.6], [-17.5, -4.5], [3.5, 17.6]
+            [42.2, 6.4], [34.5, -24.8], [-32.0, 26.5], [-41.6, -8.5],
+            [8.2, 41.8], [-12.5, -40.2], [22.5, 36.2], [-27.5, -31.8]
         ];
         shellSpots.forEach(([sx, sz], idx) => {
             const shellGroup = new THREE.Group();
-            shellGroup.position.set(sx, 0.15, sz);
+            shellGroup.position.set(sx, 0.14, sz);
             shellGroup.rotation.y = idx * 1.1;
             const shell = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.24, 0.08, 0.12, 8),
+                new THREE.CylinderGeometry(0.26, 0.09, 0.14, 8),
                 mat(idx % 2 === 0 ? 0xFFB5A7 : 0xBDE0FE, 0.35)
             );
             shell.rotation.x = 0.2;
@@ -2480,8 +2620,8 @@
             outdoorInteractables.push({
                 id: `shellfish_${idx}`,
                 type: 'shellfish',
-                pos: new THREE.Vector3(sx, 0.15, sz),
-                radius: 1.85,
+                pos: new THREE.Vector3(sx, 0.14, sz),
+                radius: 2.0,
                 label: 'Collect Beach Shellfish',
                 sub: 'Free! • +1 🐚 Shellfish',
                 icon: '🐚',
@@ -2549,6 +2689,471 @@
         });
     }
     buildPier();
+
+    // ----------------------------------------------------------------------------
+    // 4E-2. HUGE WORLD REGIONS, OUTER ACTIVITIES, TREASURES & 3D WAYPOINT BEACON
+    // ----------------------------------------------------------------------------
+    const ISLAND_REGIONS = [
+        { id: 'village', name: 'Sunbeam Village', icon: '🏝️', x: 0, z: 0.5, spawnX: 0, spawnZ: 1.5, radius: 17.5, color: '#EDE0D4', desc: 'Cozy Village Plaza, Cottages & Garden Patch' },
+        { id: 'pine_woods', name: 'Whispering Pine Woods', icon: '🌲', x: -24.5, z: -22.0, spawnX: -21.5, spawnZ: -19.5, radius: 13.5, color: '#6BA368', desc: 'Forest Wishing Well & Wild Mushroom Groves' },
+        { id: 'sunlit_orchard', name: 'Sunlit Orchard', icon: '🍎', x: 24.0, z: -19.0, spawnX: 21.0, spawnZ: -16.8, radius: 13.5, color: '#B5E48C', desc: 'Crisp Apple Trees & Beekeeper Honey Apiary' },
+        { id: 'lighthouse_cliff', name: 'Lighthouse Cliff', icon: '🗼', x: -26.0, z: 23.0, spawnX: -22.2, spawnZ: 19.8, radius: 13.5, color: '#C9C2BA', desc: 'Sunbeam Beacon & Brass Horizon Telescope' },
+        { id: 'hot_spring', name: 'Coastal Hot Spring', icon: '♨️', x: 30.0, z: 2.0, spawnX: 26.8, spawnZ: 2.0, radius: 11.5, color: '#72EFDD', desc: 'Steaming Thermal Pool (+65 ⚡ Energy Soak)' },
+        { id: 'coral_harbor', name: 'Coral Harbor Dock', icon: '⚓', x: 24.5, z: 24.5, spawnX: 22.0, spawnZ: 22.0, radius: 13.0, color: '#90E0EF', desc: 'Grand Harbor Sailboat & Deep-Sea Fishing' }
+    ];
+
+    const COMPASS_POIS = [
+        { id: 'home', icon: '🏡', name: 'Your Cottage', x: -7.2, z: -7.0 },
+        { id: 'plaza', icon: '📌', name: 'Village Plaza', x: 0, z: 0.5 },
+        { id: 'woods', icon: '🌲', name: 'Wishing Well', x: -25.5, z: -22.5 },
+        { id: 'orchard', icon: '🐝', name: 'Honey Apiary', x: 25.5, z: -18.5 },
+        { id: 'lighthouse', icon: '🗼', name: 'Lighthouse', x: -28.0, z: 25.0 },
+        { id: 'hotspring', icon: '♨️', name: 'Hot Spring', x: 30.5, z: 2.0 },
+        { id: 'harbor', icon: '⚓', name: 'Coral Harbor', x: 25.8, z: 25.8 }
+    ];
+
+    // 3D Glowing Waypoint Beacon Pillar (appears when player pins a location on the map)
+    const waypointBeacon = new THREE.Group();
+    const wpRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.65, 0.92, 24),
+        new THREE.MeshBasicMaterial({ color: 0xFF7B54, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+    );
+    wpRing.rotation.x = -Math.PI / 2;
+    wpRing.position.y = 0.08;
+    const wpBeam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.42, 18, 12, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0xFFE066, transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false })
+    );
+    wpBeam.position.y = 9.0;
+    const wpOrb = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.42, 0),
+        mat(0xFF7B54, 0.25, 0xFF9F1C, 0.85)
+    );
+    wpOrb.position.y = 2.4;
+    waypointBeacon.add(wpRing, wpBeam, wpOrb);
+    waypointBeacon.visible = false;
+    outdoorWorld.add(waypointBeacon);
+
+    // 1. NORTH-WEST: Whispering Pine Woods, Wishing Well & Wild Mushrooms
+    function createPineTree(x, z, scale = 1, canHarvest = false) {
+        const tree = new THREE.Group();
+        tree.position.set(x, 0.4, z);
+        tree.scale.setScalar(scale);
+
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.36, 1.9, 8), mat(0x6F4538));
+        trunk.position.y = 0.95;
+        trunk.castShadow = true;
+        tree.add(trunk);
+
+        [
+            [2.1, 1.55, 1.7, 0x2D6A4F],
+            [3.1, 1.2, 1.5, 0x40916C],
+            [4.0, 0.8, 1.25, 0x52B788]
+        ].forEach(([py, rad, h, col]) => {
+            const cone = new THREE.Mesh(new THREE.ConeGeometry(rad, h, 8), mat(col));
+            cone.position.y = py;
+            cone.castShadow = true;
+            tree.add(cone);
+        });
+
+        outdoorWorld.add(tree);
+        outdoorColliders.push({ x, z, r: 0.8 * scale });
+
+        if (canHarvest) {
+            const treeData = { mesh: tree, cooldown: 0 };
+            outdoorInteractables.push({
+                id: `pine_${x}_${z}`,
+                type: 'wood',
+                pos: new THREE.Vector3(x, 0.4, z),
+                radius: 2.1,
+                label: 'Gather Pine Softwood',
+                sub: 'Costs 8 ⚡ • +1 Cozy Wood',
+                icon: '🪵',
+                data: treeData
+            });
+        }
+    }
+
+    function buildPineWoods() {
+        [
+            [-18.5, -26.5, 1.15, true], [-27.2, -14.2, 1.05, true], [-31.5, -21.0, 1.2, true],
+            [-22.0, -31.0, 1.1, false], [-31.0, -28.5, 1.25, false], [-34.0, -14.5, 1.0, false],
+            [-15.5, -21.5, 0.95, false], [-28.5, -31.5, 1.15, false], [-18.0, -14.0, 0.9, false]
+        ].forEach(([px, pz, sc, harv]) => createPineTree(px, pz, sc, harv));
+
+        // Stone Wishing Well (-25.5, -22.5)
+        const well = new THREE.Group();
+        well.position.set(-25.5, 0.4, -22.5);
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.25, 0.72, 12), mat(0xADB5BD));
+        rim.position.y = 0.36;
+        rim.castShadow = true;
+        well.add(rim);
+        const poolWater = new THREE.Mesh(new THREE.CylinderGeometry(0.92, 0.92, 0.56, 12), mat(0x4CC9F0, 0.2, 0x4895EF, 0.35));
+        poolWater.position.y = 0.38;
+        well.add(poolWater);
+        [-0.95, 0.95].forEach(px => {
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 1.75, 8), mat(0x7F5539));
+            post.position.set(px, 1.25, 0);
+            post.castShadow = true;
+            well.add(post);
+        });
+        const wellRoof = new THREE.Mesh(new THREE.ConeGeometry(1.45, 0.95, 4), mat(0x9C6644));
+        wellRoof.position.y = 2.35;
+        wellRoof.rotation.y = Math.PI / 4;
+        wellRoof.castShadow = true;
+        well.add(wellRoof);
+        outdoorWorld.add(well);
+        outdoorColliders.push({ x: -25.5, z: -22.5, r: 1.35 });
+        outdoorInteractables.push({
+            id: 'forest_wishing_well',
+            type: 'wishing_well',
+            pos: new THREE.Vector3(-25.5, 0.4, -22.5),
+            radius: 2.6,
+            label: 'Make a Wish at Well',
+            sub: 'Costs 5 🪙 • Blessing: +40 ⚡ & woodland gift!',
+            icon: '🪙',
+            data: { cooldown: 0 }
+        });
+
+        // 4 Forageable Forest Mushroom Clusters
+        const mushSpots = [[-20.5, -24.2], [-28.2, -19.2], [-23.4, -15.4], [-29.0, -25.6]];
+        mushSpots.forEach(([mx, mz], idx) => {
+            const mg = new THREE.Group();
+            mg.position.set(mx, 0.4, mz);
+            [[0, 0, 1], [-0.22, 0.16, 0.72], [0.24, -0.12, 0.8]].forEach(([ox, oz, sc]) => {
+                const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * sc, 0.08 * sc, 0.28 * sc, 7), mat(0xFFF3E0));
+                stem.position.set(ox, 0.14 * sc, oz);
+                const cap = new THREE.Mesh(new THREE.ConeGeometry(0.22 * sc, 0.2 * sc, 8), mat(idx % 2 === 0 ? 0xE07A5F : 0xF4A261));
+                cap.position.set(ox, 0.3 * sc, oz);
+                mg.add(stem, cap);
+            });
+            outdoorWorld.add(mg);
+            const mData = { mesh: mg, available: true, timer: 0 };
+            outdoorInteractables.push({
+                id: `mushroom_${idx}`,
+                type: 'mushroom',
+                pos: new THREE.Vector3(mx, 0.4, mz),
+                radius: 1.85,
+                label: 'Forage Woodland Mushrooms',
+                sub: 'Free! • +2 🍄 Mushrooms',
+                icon: '🍄',
+                data: mData
+            });
+        });
+    }
+    buildPineWoods();
+
+    // 2. NORTH-EAST: Sunlit Apple Orchard & Cozy Beekeeper's Apiary
+    function buildOrchardAndApiary() {
+        const orchardTrees = [
+            { x: 21.8, z: -23.0, harvest: true },
+            { x: 27.2, z: -21.2, harvest: true },
+            { x: 19.8, z: -14.0, harvest: true },
+            { x: 28.4, z: -15.2, harvest: true },
+            { x: 30.8, z: -23.8, harvest: false },
+            { x: 17.5, z: -24.5, harvest: false }
+        ];
+        orchardTrees.forEach((spec, idx) => {
+            const tree = new THREE.Group();
+            tree.position.set(spec.x, 0.4, spec.z);
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.36, 1.7, 8), mat(0x8D5B4C));
+            trunk.position.y = 0.85;
+            trunk.castShadow = true;
+            tree.add(trunk);
+
+            const canopy = new THREE.Mesh(new THREE.DodecahedronGeometry(1.35, 1), mat(0x80ED99));
+            canopy.position.y = 2.25;
+            canopy.castShadow = true;
+            tree.add(canopy);
+
+            const apples = [];
+            if (spec.harvest) {
+                [[0.75, 1.9, 0.85], [-0.8, 2.1, 0.7], [0.25, 2.5, -0.9], [-0.4, 1.85, -0.75]].forEach(([ax, ay, az]) => {
+                    const ap = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), mat(0xFF4D6D));
+                    ap.position.set(ax, ay, az);
+                    tree.add(ap);
+                    apples.push(ap);
+                });
+            }
+            outdoorWorld.add(tree);
+            outdoorColliders.push({ x: spec.x, z: spec.z, r: 0.85 });
+
+            if (spec.harvest) {
+                const appleData = { apples, hasApples: true, timer: 0 };
+                outdoorInteractables.push({
+                    id: `apple_tree_${idx}`,
+                    type: 'apple_tree',
+                    pos: new THREE.Vector3(spec.x, 0.4, spec.z),
+                    radius: 2.2,
+                    label: 'Pick Orchard Apples',
+                    sub: 'Costs 4 ⚡ • +2 🍎 Crisp Apples',
+                    icon: '🍎',
+                    data: appleData
+                });
+            }
+        });
+
+        // Cozy Beekeeper's Apiary (25.5, -18.5)
+        const apiary = new THREE.Group();
+        apiary.position.set(25.5, 0.4, -18.5);
+        [-0.75, 0.75].forEach((hx, i) => {
+            const stand = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.45, 0.75), mat(0x8D5B4C));
+            stand.position.set(hx, 0.22, 0);
+            const hive = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.82, 0.68), mat(i === 0 ? 0xFCD581 : 0xFFE599));
+            hive.position.set(hx, 0.85, 0);
+            hive.castShadow = true;
+            const lid = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.14, 0.78), mat(0xE07A5F));
+            lid.position.set(hx, 1.32, 0);
+            apiary.add(stand, hive, lid);
+        });
+        for (let b = 0; b < 4; b++) {
+            const bee = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), mat(0xFFB703, 0.4, 0xFFBE0B, 0.4));
+            apiary.add(bee);
+            animatedProps.push({
+                mesh: bee,
+                update: (t) => {
+                    const ang = t * 2.6 + b * 1.57;
+                    bee.position.set(Math.cos(ang) * (1.05 + (b % 2) * 0.35), 1.35 + Math.sin(t * 4 + b) * 0.22, Math.sin(ang) * 0.9);
+                }
+            });
+        }
+        outdoorWorld.add(apiary);
+        outdoorColliders.push({ x: 25.5, z: -18.5, r: 1.25 });
+        outdoorInteractables.push({
+            id: 'orchard_apiary',
+            type: 'apiary',
+            pos: new THREE.Vector3(25.5, 0.4, -18.5),
+            radius: 2.4,
+            label: 'Harvest Golden Honey',
+            sub: 'Free! • +1 🍯 Wildflower Honey',
+            icon: '🍯',
+            data: { available: true, timer: 0 }
+        });
+    }
+    buildOrchardAndApiary();
+
+    // 3. SOUTH-WEST: Sunbeam Coastal Lighthouse Cliff & Horizon Telescope
+    let lighthouseBeaconPivot = null;
+    function buildLighthouseCliff() {
+        const lh = new THREE.Group();
+        lh.position.set(-27.8, 0.68, 24.8);
+
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.95, 1.1, 12), mat(0xADB5BD));
+        base.position.y = 0.55;
+        base.castShadow = true;
+        lh.add(base);
+
+        [
+            [1.65, 1.35, 1.18, 1.15, 0xFFF9F0],
+            [2.80, 1.18, 1.02, 1.15, 0xE07A5F],
+            [3.95, 1.02, 0.88, 1.15, 0xFFF9F0],
+            [5.05, 0.88, 0.76, 1.05, 0xE07A5F]
+        ].forEach(([y, rB, rT, h, col]) => {
+            const tier = new THREE.Mesh(new THREE.CylinderGeometry(rT, rB, h, 14), mat(col));
+            tier.position.y = y;
+            tier.castShadow = true;
+            lh.add(tier);
+        });
+
+        const gallery = new THREE.Mesh(new THREE.CylinderGeometry(1.02, 0.85, 0.22, 14), mat(0x4A352F));
+        gallery.position.y = 5.65;
+        lh.add(gallery);
+
+        const lanternGlass = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.56, 0.56, 0.85, 12),
+            mat(0xFFE599, 0.15, 0xFFD166, 0.9)
+        );
+        lanternGlass.position.y = 6.15;
+        lh.add(lanternGlass);
+
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(0.78, 0.85, 12), mat(0xE07A5F));
+        cap.position.y = 6.95;
+        lh.add(cap);
+
+        lighthouseBeaconPivot = new THREE.Group();
+        lighthouseBeaconPivot.position.y = 6.15;
+        const beamMat = new THREE.MeshBasicMaterial({ color: 0xFFF3B0, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
+        const beam = new THREE.Mesh(new THREE.ConeGeometry(2.2, 12, 14, 1, true), beamMat);
+        beam.rotation.z = -Math.PI / 2;
+        beam.position.x = 6.2;
+        lighthouseBeaconPivot.add(beam);
+        lh.add(lighthouseBeaconPivot);
+
+        outdoorWorld.add(lh);
+        outdoorColliders.push({ x: -27.8, z: 24.8, r: 1.95 });
+
+        // Brass Horizon Telescope (-24.2, 22.0)
+        const scope = new THREE.Group();
+        scope.position.set(-24.2, 0.68, 22.0);
+        scope.rotation.y = -Math.PI * 0.72;
+        const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.12, 1.05, 8), mat(0x5C3A2E));
+        stand.position.y = 0.52;
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.72, 10), mat(0xD4A373, 0.3));
+        barrel.position.set(0, 1.08, 0.08);
+        barrel.rotation.x = Math.PI * 0.42;
+        scope.add(stand, barrel);
+        outdoorWorld.add(scope);
+        outdoorColliders.push({ x: -24.2, z: 22.0, r: 0.5 });
+        outdoorInteractables.push({
+            id: 'cliff_telescope',
+            type: 'telescope',
+            pos: new THREE.Vector3(-24.2, 0.68, 22.0),
+            radius: 2.1,
+            label: 'Look Through Horizon Telescope',
+            sub: 'Scan Archipelago (+12 💖 & Spot Treasures!)',
+            icon: '🔭'
+        });
+
+        createPineTree(-22.5, 27.5, 1.0, true);
+        createPineTree(-31.5, 19.5, 1.05, true);
+    }
+    buildLighthouseCliff();
+
+    // 4. EAST: Steaming Coastal Hot Spring Pool (30.5, 2.0)
+    const steamPuffs = [];
+    function buildHotSpring() {
+        const hs = new THREE.Group();
+        hs.position.set(30.5, 0.4, 2.0);
+
+        const stoneRim = new THREE.Mesh(new THREE.TorusGeometry(2.65, 0.48, 8, 20), mat(0x9C9288, 0.92));
+        stoneRim.rotation.x = Math.PI / 2;
+        stoneRim.position.y = 0.16;
+        stoneRim.castShadow = true;
+        hs.add(stoneRim);
+
+        const springWater = new THREE.Mesh(
+            new THREE.CylinderGeometry(2.45, 2.45, 0.25, 20),
+            mat(0x64DFDF, 0.15, 0x48BFE3, 0.42)
+        );
+        springWater.position.y = 0.12;
+        hs.add(springWater);
+
+        for (let i = 0; i < 6; i++) {
+            const puff = new THREE.Mesh(
+                new THREE.SphereGeometry(0.28 + (i % 2) * 0.1, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.35 })
+            );
+            puff.position.set((Math.random() - 0.5) * 2.4, 0.4 + i * 0.35, (Math.random() - 0.5) * 2.4);
+            hs.add(puff);
+            steamPuffs.push({ mesh: puff, baseX: puff.position.x, baseZ: puff.position.z, phase: i * 1.1 });
+        }
+
+        outdoorWorld.add(hs);
+        outdoorColliders.push({ x: 30.5, z: 2.0, r: 2.75 });
+        outdoorInteractables.push({
+            id: 'coastal_hot_spring',
+            type: 'hot_spring',
+            pos: new THREE.Vector3(27.5, 0.4, 2.0),
+            radius: 2.6,
+            label: 'Soak in Steaming Hot Spring',
+            sub: 'Free! • Restores +65 ⚡ Energy & +12 💖',
+            icon: '♨️',
+            data: { cooldown: 0 }
+        });
+    }
+    buildHotSpring();
+
+    // 5. SOUTH-EAST: Coral Harbor Outer Dock, Sailboat & Deep-Sea Fishing
+    function buildCoralHarbor() {
+        const dock = new THREE.Group();
+        dock.position.set(23.5, 0.36, 23.5);
+        dock.rotation.y = Math.PI * 0.25;
+
+        for (let i = 0; i < 8; i++) {
+            const plank = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.15, 0.62), mat(0x9C6644));
+            plank.position.set(0, 0.05, i * 0.7);
+            plank.castShadow = true;
+            plank.receiveShadow = true;
+            dock.add(plank);
+        }
+        [[-1.3, 0.5], [1.3, 0.5], [-1.3, 4.7], [1.3, 4.7]].forEach(([px, pz]) => {
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.45, 8), mat(0x6F4538));
+            post.position.set(px, 0.15, pz);
+            post.castShadow = true;
+            dock.add(post);
+        });
+        outdoorWorld.add(dock);
+
+        // Moored Pastel Sailboat gently bobbing near the outer dock
+        const boat = new THREE.Group();
+        boat.position.set(29.8, -0.35, 25.2);
+        boat.rotation.y = -0.5;
+        const hull = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.65, 3.4), mat(0xFFF9F0));
+        const trim = new THREE.Mesh(new THREE.BoxGeometry(1.78, 0.18, 3.45), mat(0x5FA8D3));
+        trim.position.y = 0.28;
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 2.8, 8), mat(0x8D5B4C));
+        mast.position.y = 1.6;
+        const sail = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.2, 3), mat(0xFFB5A7));
+        sail.position.set(0.1, 1.75, 0.2);
+        sail.rotation.y = Math.PI * 0.5;
+        boat.add(hull, trim, mast, sail);
+        outdoorWorld.add(boat);
+        animatedProps.push({
+            mesh: boat,
+            update: (t) => {
+                boat.position.y = -0.35 + Math.sin(t * 1.6) * 0.09;
+                boat.rotation.z = Math.sin(t * 1.3) * 0.04;
+            }
+        });
+
+        const deepRing = new THREE.Mesh(
+            new THREE.RingGeometry(0.45, 0.62, 20),
+            new THREE.MeshBasicMaterial({ color: 0xFFE599, transparent: true, opacity: 0.65, side: THREE.DoubleSide })
+        );
+        deepRing.rotation.x = -Math.PI / 2;
+        deepRing.position.set(28.5, -0.5, 28.5);
+        outdoorWorld.add(deepRing);
+        animatedProps.push({
+            mesh: deepRing,
+            update: (t) => {
+                deepRing.scale.setScalar(1 + Math.sin(t * 2.5) * 0.24);
+            }
+        });
+
+        outdoorInteractables.push({
+            id: 'harbor_deep_fishing',
+            type: 'fish',
+            deepSea: true,
+            pos: new THREE.Vector3(26.2, 0.4, 26.2),
+            radius: 2.6,
+            label: 'Deep-Sea Harbor Fishing',
+            sub: 'Costs 10 ⚡ • Boosted Rare Trout & Moon Carp!',
+            icon: '⚓'
+        });
+    }
+    buildCoralHarbor();
+
+    // 6. ISLAND-WIDE BURIED BEACH TREASURE CHESTS (5 spots along the sandy rim)
+    function spawnBeachTreasures() {
+        const spots = [
+            [40.2, -13.5], [-40.8, 7.2], [7.8, -40.8], [-15.8, 39.2], [36.8, 20.5]
+        ];
+        spots.forEach(([tx, tz], idx) => {
+            const g = new THREE.Group();
+            g.position.set(tx, 0.14, tz);
+            g.rotation.y = idx * 0.9;
+            const chest = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.42, 0.48), mat(0x9C6644));
+            chest.position.y = 0.21;
+            chest.castShadow = true;
+            const band = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.52), mat(0xFFD166, 0.3));
+            band.position.y = 0.28;
+            g.add(chest, band);
+            outdoorWorld.add(g);
+
+            const tData = { mesh: g, available: true, timer: 0 };
+            outdoorInteractables.push({
+                id: `treasure_${idx}`,
+                type: 'treasure',
+                pos: new THREE.Vector3(tx, 0.14, tz),
+                radius: 2.2,
+                label: 'Open Driftwood Treasure',
+                sub: 'Free! • Sunbeam Coins & Island Loot 💎',
+                icon: '💎',
+                data: tData
+            });
+        });
+    }
+    spawnBeachTreasures();
 
     // ----------------------------------------------------------------------------
     // 4F. TREES & BERRY BUSHES
@@ -2826,7 +3431,8 @@
             { x: 7.4, z: -1.4, label: "Visiting Pip's Bakery" },
             { x: -7.6, z: 2.1, label: "Visiting Clover's Cabin" },
             { x: 6.8, z: 7.2, label: "Harbor Walk" },
-            { x: -4.5, z: -3.5, label: 'Exploring Red Cottage Path' }
+            { x: -4.5, z: -3.5, label: 'Exploring Red Cottage Path' },
+            { x: 18.5, z: -14.5, label: 'Heading to Sunlit Orchard' }
         ],
         afternoon: [
             { x: -1.6, z: -0.4, label: 'Hanging Out in Plaza' },
@@ -2834,13 +3440,14 @@
             { x: -1.2, z: 1.9, label: 'Chatting by Bulletin Board' },
             { x: 1.4, z: 1.9, label: 'Enjoying Village Breeze' },
             { x: 3.4, z: -4.6, label: 'Checking Pumpkin Patch' },
-            { x: -3.2, z: 5.5, label: 'Meadow Walk' }
+            { x: -18.0, z: -15.5, label: 'Pine Woods Trail Walk' },
+            { x: 22.0, z: 1.2, label: 'East Coast Breeze Walk' }
         ],
         sunset: [
             { x: 9.2, z: 9.0, label: 'Watching Sunset at Pier' },
             { x: 10.6, z: 10.4, label: 'Strolling on Wooden Pier' },
-            { x: 7.8, z: 10.2, label: 'Beach Sunset Walk' },
-            { x: 4.5, z: 12.2, label: 'Collecting Evening Breeze' }
+            { x: 20.5, z: 20.5, label: 'Coral Harbor Sunset Walk' },
+            { x: -20.5, z: 18.5, label: 'Lighthouse Cliff View' }
         ]
     };
 
@@ -2940,11 +3547,11 @@
                 let nextX = v.curX + dirX * walkSpeed * dt;
                 let nextZ = v.curZ + dirZ * walkSpeed * dt;
 
-                // Keep freestyle wander comfortably inside island shoreline
+                // Keep freestyle wander comfortably inside expanded island shoreline
                 const rCenter = Math.hypot(nextX, nextZ);
-                if (rCenter > 17.5) {
-                    nextX = (nextX / rCenter) * 17.5;
-                    nextZ = (nextZ / rCenter) * 17.5;
+                if (rCenter > 39.5) {
+                    nextX = (nextX / rCenter) * 39.5;
+                    nextZ = (nextZ / rCenter) * 39.5;
                 }
 
                 v.curX = nextX;
@@ -2977,7 +3584,9 @@
         const butterflySpecs = [
             { bx: -1.4, bz: -4.2, col: 0xFF8FAB },
             { bx: 3.4, bz: -4.8, col: 0xFCD581 },
-            { bx: -5.4, bz: 4.8, col: 0xBDB2FF }
+            { bx: -5.4, bz: 4.8, col: 0xBDB2FF },
+            { bx: 23.0, bz: -16.5, col: 0xFFADAD },
+            { bx: 26.5, bz: -23.0, col: 0xCAFFBF }
         ];
         butterflySpecs.forEach((spec, i) => {
             const g = new THREE.Group();
@@ -3322,6 +3931,8 @@
 
             if (targetZone === 'outdoor') {
                 player.position.set(gameState.savedOutdoorPos.x, 0.4, gameState.savedOutdoorPos.z);
+                currentGroundY = 0.4;
+                waypointBeacon.visible = Boolean(gameState.waypoint);
                 cameraAngle = Math.PI * 0.25;
                 cameraPitch = 0.62;
                 cameraDist = 16.0;
@@ -3365,6 +3976,15 @@
                 attemptReelFish();
             } else if (!isModalOpen() && activeInteractable) {
                 triggerInteraction(activeInteractable);
+            }
+        }
+        if (e.code === 'KeyM') {
+            if (!document.getElementById('map-modal').classList.contains('hidden')) {
+                audio.playUIClick();
+                closeAllModals();
+            } else if (!isModalOpen()) {
+                audio.playPaper();
+                openMapModal();
             }
         }
         if (e.code === 'Escape') {
@@ -3475,13 +4095,14 @@
                !document.getElementById('mailbox-modal').classList.contains('hidden') ||
                !document.getElementById('wardrobe-modal').classList.contains('hidden') ||
                !document.getElementById('satchel-modal').classList.contains('hidden') ||
+               !document.getElementById('map-modal').classList.contains('hidden') ||
                gameState.fishing.active;
     }
 
     function closeAllModals() {
         [
             'dialogue-modal', 'decor-modal', 'neighbors-modal', 'kitchen-modal',
-            'bulletin-modal', 'mailbox-modal', 'wardrobe-modal', 'satchel-modal'
+            'bulletin-modal', 'mailbox-modal', 'wardrobe-modal', 'satchel-modal', 'map-modal'
         ].forEach(id => {
             const el = document.getElementById(id);
             el.classList.add('hidden');
@@ -3597,9 +4218,15 @@
             return `You're making friends, ${name}! Step inside Pip's Bakery, Clover's Cabin, or Barnaby's Boathouse.`;
         }
         if (q('craft_decor') && !q('craft_decor').done) {
-            return `Almost done, ${name}! Visit your Camp Workbench to craft a Bug Net or cozy decor.`;
+            return `Almost there, ${name}! Visit your Camp Workbench to craft a Bug Net or cozy decor.`;
         }
-        return `You're a true Sunbeam Islander, ${name}! Explore freestyle, check the Bulletin Board, or enjoy the Lantern Festival!`;
+        if (q('explore_regions') && !q('explore_regions').done) {
+            return `The whole island awaits, ${name}! Follow your Compass or open the Map [M] to discover 3 outer regions (Pine Woods, Orchard, Cliff, or Hot Spring).`;
+        }
+        if (q('find_treasure') && !q('find_treasure').done) {
+            return `Keep exploring, ${name}! Walk the outer beach for Driftwood Treasure 💎 or toss coins in the Pine Woods Wishing Well 🪙.`;
+        }
+        return `You're a master explorer of Sunbeam Cove, ${name}! Pin waypoints on the Map [M], soak at the Hot Spring, or enjoy the Lantern Festival!`;
     }
 
     // ----------------------------------------------------------------------------
@@ -3727,7 +4354,132 @@
         }
         else if (item.type === 'fish') {
             if (!spendEnergy(10)) return;
-            startFishingMinigame();
+            startFishingMinigame(Boolean(item.deepSea));
+        }
+        else if (item.type === 'wishing_well') {
+            if (item.data.cooldown > 0) {
+                audio.playPop();
+                showToast(`The Wishing Well ripples softly... wait ${Math.ceil(item.data.cooldown)}s before wishing again.`, '🪙');
+                return;
+            }
+            if (gameState.coins < 5) {
+                audio.playAlert();
+                showToast('Need 5 Sunbeam Coins to toss in the Wishing Well!', '🪙');
+                return;
+            }
+            gameState.coins -= 5;
+            item.data.cooldown = 20;
+            gameState.energy = Math.min(gameState.maxEnergy, gameState.energy + 40);
+            gameState.cozyScore += 15;
+            const roll = Math.random();
+            let bonusMsg = '+40 ⚡ Energy & +15 💖';
+            if (roll < 0.34) {
+                gameState.inventory.honey += 1;
+                bonusMsg += ' +1 🍯 Honey';
+            } else if (roll < 0.68) {
+                gameState.inventory.mushrooms += 2;
+                bonusMsg += ' +2 🍄 Mushrooms';
+            } else {
+                gameState.coins += 18;
+                bonusMsg += ' +18 🪙 Lucky Coins';
+            }
+            audio.playChime();
+            showToast(`Wishing Well Blessed You! (${bonusMsg})`, '✨');
+            advanceQuest('find_treasure', 1);
+            updateHUD();
+        }
+        else if (item.type === 'mushroom') {
+            const m = item.data;
+            if (!m.available) return;
+            m.available = false;
+            m.timer = 22;
+            m.mesh.visible = false;
+            item.enabled = false;
+            gameState.inventory.mushrooms += 2;
+            gameState.cozyScore += 6;
+            audio.playHarvest();
+            showToast('Foraged Woodland Mushrooms! (+2 🍄)', '🍄');
+            updateHUD();
+        }
+        else if (item.type === 'apple_tree') {
+            const a = item.data;
+            if (!a.hasApples) {
+                audio.playAlert();
+                showToast('New orchard apples are ripening soon!', '🍎');
+                return;
+            }
+            if (!spendEnergy(4)) return;
+            a.hasApples = false;
+            a.timer = 20;
+            a.apples.forEach(ap => { ap.visible = false; });
+            gameState.inventory.apples += 2;
+            gameState.cozyScore += 7;
+            audio.playHarvest();
+            showToast('Picked Crisp Orchard Apples! (+2 🍎)', '🍎');
+            updateHUD();
+        }
+        else if (item.type === 'apiary') {
+            const ap = item.data;
+            if (!ap.available) {
+                audio.playAlert();
+                showToast('The busy bees are filling more golden honeycombs!', '🐝');
+                return;
+            }
+            ap.available = false;
+            ap.timer = 24;
+            gameState.inventory.honey += 1;
+            gameState.cozyScore += 10;
+            audio.playChime();
+            showToast('Harvested Wildflower Honey! (+1 🍯, +10 💖)', '🍯');
+            updateHUD();
+        }
+        else if (item.type === 'telescope') {
+            audio.playPop();
+            if (gameState.telescopeUsedDay !== gameState.day) {
+                gameState.telescopeUsedDay = gameState.day;
+                gameState.cozyScore += 12;
+                gameState.energy = Math.min(gameState.maxEnergy, gameState.energy + 10);
+                audio.playChime();
+                showToast('Scanned the shimmering archipelago! Spotted beach treasures & reef fish (+12 💖, +10 ⚡)', '🔭');
+                updateHUD();
+            } else {
+                showToast('You gaze out across the sunlit sea & Lighthouse reef... so peaceful!', '🔭');
+            }
+        }
+        else if (item.type === 'hot_spring') {
+            const hs = item.data;
+            if (hs.cooldown > 0) {
+                audio.playPop();
+                showToast('You already feel wonderfully refreshed from the warm waters!', '♨️');
+                return;
+            }
+            hs.cooldown = 18;
+            gameState.energy = Math.min(gameState.maxEnergy, gameState.energy + 65);
+            gameState.cozyScore += 12;
+            audio.playWater();
+            setTimeout(() => audio.playLullaby(), 120);
+            showToast('Soaked in the Steaming Hot Spring! (+65 ⚡ Energy, +12 💖)', '♨️');
+            updateHUD();
+        }
+        else if (item.type === 'treasure') {
+            const tr = item.data;
+            if (!tr.available) return;
+            tr.available = false;
+            tr.timer = 38;
+            tr.mesh.visible = false;
+            item.enabled = false;
+            const coinBonus = 14 + Math.floor(Math.random() * 12);
+            gameState.coins += coinBonus;
+            gameState.cozyScore += 14;
+            let extra = '';
+            const r = Math.random();
+            if (r < 0.4) { gameState.inventory.shellfish += 1; extra = ' +1 🐚'; }
+            else if (r < 0.75) { gameState.inventory.wood += 2; extra = ' +2 🪵'; }
+            else { gameState.inventory.honey += 1; extra = ' +1 🍯'; }
+            audio.playCoins();
+            showToast(`Opened Beach Treasure! (+${coinBonus} 🪙${extra}, +14 💖)`, '💎');
+            advanceQuest('find_treasure', 1);
+            updateHUD();
         }
         else if (item.type === 'wood') {
             const tree = item.data;
@@ -3780,21 +4532,23 @@
     }
 
     // --- Fishing Mini-game (Sunfish, Rainbow Trout, Night-Only Moon Carp) ---
-    function startFishingMinigame() {
+    function startFishingMinigame(isDeepSea = false) {
         const f = gameState.fishing;
         const isNight = gameState.timeOfDay >= 0.62 || gameState.timeOfDay < 0.08;
         let catchType = 'fish';
         let speed = 0.85;
         let targetWidth = 0.30;
-        let statusText = 'Tap Reel when the bobber hits green!';
+        let statusText = isDeepSea ? 'Deep-Sea Harbor cast! Tap Reel on green!' : 'Tap Reel when the bobber hits green!';
 
         const roll = Math.random();
-        if (isNight && roll < 0.48) {
+        const moonChance = isDeepSea ? 0.65 : 0.48;
+        const troutChance = isDeepSea ? 0.60 : 0.35;
+        if (isNight && roll < moonChance) {
             catchType = 'moonCarp';
             speed = 1.08;
             targetWidth = 0.24;
             statusText = '🌙 Something luminous tugs! (Rare Night Moon Carp!)';
-        } else if (roll < 0.35) {
+        } else if (roll < troutChance) {
             catchType = 'trout';
             speed = 0.98;
             targetWidth = 0.26;
@@ -4101,6 +4855,36 @@
         showToast('Simmered Honey Herb Broth! Energy 100% ⚡ & +15 💖', '🍲');
         updateHUD();
     });
+    document.getElementById('bake-crisp-btn').addEventListener('click', () => {
+        if (gameState.inventory.apples < 2 || gameState.inventory.honey < 1) {
+            audio.playAlert();
+            showToast('Need 2 🍎 Apples and 1 🍯 Wildflower Honey!', '🍏');
+            return;
+        }
+        gameState.inventory.apples -= 2;
+        gameState.inventory.honey -= 1;
+        gameState.inventory.crisp += 1;
+        gameState.cozyScore += 22;
+        audio.playCook(true);
+        showToast('Baked warm Honey Apple Crisp! (+1 🍏, +22 💖)', '🍏');
+        updateHUD();
+    });
+
+    document.getElementById('cook-soup-btn').addEventListener('click', () => {
+        if (gameState.inventory.mushrooms < 2 || gameState.inventory.flowers < 1) {
+            audio.playAlert();
+            showToast('Need 2 🍄 Mushrooms and 1 🌸 Flower!', '🍄');
+            return;
+        }
+        gameState.inventory.mushrooms -= 2;
+        gameState.inventory.flowers -= 1;
+        gameState.inventory.soup += 1;
+        gameState.cozyScore += 18;
+        audio.playCook(false);
+        showToast('Simmered Woodland Mushroom Soup! (+1 🍲, +18 💖)', '🍄');
+        updateHUD();
+    });
+
     document.getElementById('close-kitchen-btn').addEventListener('click', () => {
         audio.playUIClick();
         closeAllModals();
@@ -4445,6 +5229,9 @@
             { icon: '🦋', name: 'Bug Net Tool', val: gameState.hasBugNet ? 'Owned' : 'Craft at Bench' },
             { icon: '🫐', name: 'Wild Berries', val: gameState.inventory.berries },
             { icon: '🍓', name: 'Strawberries', val: gameState.inventory.strawberries },
+            { icon: '🍎', name: 'Orchard Apples', val: gameState.inventory.apples },
+            { icon: '🍯', name: 'Wildflower Honey', val: gameState.inventory.honey },
+            { icon: '🍄', name: 'Pine Mushrooms', val: gameState.inventory.mushrooms },
             { icon: '🎃', name: 'Pumpkins', val: gameState.inventory.pumpkins },
             { icon: '🌾', name: 'Golden Wheat', val: gameState.inventory.wheat },
             { icon: '🌸', name: 'Wildflowers', val: gameState.inventory.flowers },
@@ -4457,7 +5244,9 @@
             { icon: '✨', name: 'Glowing Fireflies', val: gameState.inventory.fireflies },
             { icon: '🍵', name: 'Berry Tea', val: gameState.inventory.tea },
             { icon: '🥧', name: 'Pumpkin Pie', val: gameState.inventory.pie },
-            { icon: '🍰', name: 'Strawberry Shortcake', val: gameState.inventory.shortcake }
+            { icon: '🍰', name: 'Strawberry Shortcake', val: gameState.inventory.shortcake },
+            { icon: '🍏', name: 'Honey Apple Crisp', val: gameState.inventory.crisp },
+            { icon: '🍲', name: 'Mushroom Soup', val: gameState.inventory.soup }
         ];
         document.getElementById('satchel-grid').innerHTML = items.map(it => `
             <div class="bg-[#F7EDE2] border-2 border-[#E6CCB2] rounded-2xl p-2.5 flex items-center gap-2.5">
@@ -4473,6 +5262,547 @@
     }
 
     // ----------------------------------------------------------------------------
+    // 8B. LIVE COMPASS, MINIMAP RADAR & INTERACTIVE ARCHIPELAGO MAP ENGINE
+    // ----------------------------------------------------------------------------
+    const CARDINAL_DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+
+    function getRegionAt(x, z) {
+        if (gameState.zone !== 'outdoor') {
+            return { id: gameState.zone, name: zoneMeta[gameState.zone]?.toast ? zoneMeta[gameState.zone].badge.replace(/<[^>]+>/g, ' ').trim() : 'Indoors', icon: '🏡' };
+        }
+        let best = ISLAND_REGIONS[0];
+        let bestD = Infinity;
+        for (let i = 1; i < ISLAND_REGIONS.length; i++) {
+            const reg = ISLAND_REGIONS[i];
+            const d = Math.hypot(x - reg.x, z - reg.z);
+            if (d <= reg.radius && d < bestD) {
+                best = reg;
+                bestD = d;
+            }
+        }
+        if (Math.hypot(x, z) > 41.2 && best.id === 'village') {
+            return { id: 'beach', name: 'Golden Shoreline', icon: '🏖️' };
+        }
+        return best;
+    }
+
+    function checkRegionDiscovery(px, pz) {
+        if (gameState.zone !== 'outdoor') return;
+        const reg = getRegionAt(px, pz);
+        if (reg && ISLAND_REGIONS.some(r => r.id === reg.id) && !gameState.discoveredRegions.includes(reg.id)) {
+            gameState.discoveredRegions.push(reg.id);
+            gameState.cozyScore += 15;
+            audio.playChime();
+            showToast(`Discovered ${reg.name}! Fast Travel unlocked on Map (+15 💖)`, reg.icon);
+            if (reg.id !== 'village') {
+                advanceQuest('explore_regions', 1);
+            }
+            updateHUD();
+        }
+    }
+
+    function setCustomWaypoint(x, z, name = 'Custom Pin') {
+        const dist = Math.hypot(x, z);
+        if (dist > 44.5) {
+            x = (x / dist) * 44.5;
+            z = (z / dist) * 44.5;
+        }
+        gameState.waypoint = { x, z, name };
+        waypointBeacon.position.set(x, 0.4, z);
+        waypointBeacon.visible = (gameState.zone === 'outdoor');
+        const clearBtn = document.getElementById('clear-waypoint-btn');
+        if (clearBtn) clearBtn.classList.remove('hidden');
+    }
+
+    function clearCustomWaypoint(silent = false) {
+        gameState.waypoint = null;
+        waypointBeacon.visible = false;
+        const clearBtn = document.getElementById('clear-waypoint-btn');
+        if (clearBtn) clearBtn.classList.add('hidden');
+        if (!silent) showToast('Waypoint pin cleared.', '📍');
+    }
+
+    function fastTravelToRegion(regionId) {
+        const reg = ISLAND_REGIONS.find(r => r.id === regionId);
+        if (!reg) return;
+        if (!gameState.discoveredRegions.includes(reg.id)) {
+            audio.playAlert();
+            showToast(`Explore ${reg.name} on foot first to unlock Fast Travel!`, '🧭');
+            return;
+        }
+        closeAllModals();
+        const curtain = document.getElementById('scene-curtain');
+        curtain.classList.remove('opacity-0');
+        curtain.classList.add('opacity-100');
+        audio.playChime();
+
+        setTimeout(() => {
+            if (gameState.zone !== 'outdoor') {
+                gameState.zone = 'outdoor';
+                Object.entries(zoneWorlds).forEach(([k, grp]) => {
+                    grp.visible = k === 'outdoor';
+                });
+                cameraPitch = 0.62;
+                cameraDist = 16.0;
+            }
+            const initY = reg.id === 'lighthouse' ? 0.68 : 0.4;
+            player.position.set(reg.spawnX, initY, reg.spawnZ);
+            currentGroundY = initY;
+            document.getElementById('location-badge').innerHTML = zoneMeta.outdoor.badge;
+            updateCompassUI();
+            renderMinimap();
+            showToast(`Fast Traveled to ${reg.name}!`, reg.icon);
+            setTimeout(() => {
+                curtain.classList.remove('opacity-100');
+                curtain.classList.add('opacity-0');
+            }, 140);
+        }, 220);
+    }
+
+    // Build reusable compass ticks & POI markers inside #compass-tape
+    const compassItems = [];
+    function initCompassTape() {
+        const tape = document.getElementById('compass-tape');
+        if (!tape || compassItems.length) return;
+
+        for (let b = 0; b < 360; b += 15) {
+            const isMajor = b % 45 === 0;
+            const el = document.createElement('div');
+            el.className = 'absolute top-0 flex flex-col items-center justify-center h-full -translate-x-1/2 pointer-events-none';
+            if (isMajor) {
+                const label = CARDINAL_DIRS[b / 45];
+                el.innerHTML = `<span class="text-[10px] font-extrabold ${label === 'N' ? 'text-[#E07A5F]' : 'text-[#5C3A2E]'} leading-none">${label}</span><span class="w-[1.5px] h-1.5 bg-[#8D5B4C] mt-0.5"></span>`;
+            } else {
+                el.innerHTML = `<span class="w-[1px] h-2 bg-[#C8A889] mt-2"></span>`;
+            }
+            tape.appendChild(el);
+            compassItems.push({ el, fixedDeg: b, type: 'tick' });
+        }
+
+        COMPASS_POIS.forEach(poi => {
+            const el = document.createElement('div');
+            el.className = 'absolute top-0.5 flex items-center justify-center h-5 -translate-x-1/2 pointer-events-none text-[11px] leading-none drop-shadow-xs';
+            el.textContent = poi.icon;
+            tape.appendChild(el);
+            compassItems.push({ el, poi, type: 'poi' });
+        });
+
+        const wpEl = document.createElement('div');
+        wpEl.className = 'absolute top-0.5 flex items-center justify-center h-5 -translate-x-1/2 pointer-events-none text-xs leading-none hidden';
+        wpEl.textContent = '📍';
+        tape.appendChild(wpEl);
+        compassItems.push({ el: wpEl, type: 'waypoint' });
+    }
+    initCompassTape();
+
+    function updateCompassUI() {
+        const headingEl = document.getElementById('compass-heading');
+        const regionEl = document.getElementById('compass-region');
+        const winEl = document.getElementById('compass-window');
+        if (!headingEl || !regionEl || !winEl) return;
+
+        const deg = (((-cameraAngle * 180) / Math.PI) % 360 + 360) % 360;
+        const cardinal = CARDINAL_DIRS[Math.round(deg / 45) % 8];
+        headingEl.textContent = `${cardinal} ${String(Math.round(deg) % 360).padStart(3, '0')}°`;
+
+        const reg = getRegionAt(player.position.x, player.position.z);
+        regionEl.textContent = `${reg.icon} ${reg.name}`;
+
+        const winW = winEl.clientWidth || 240;
+        const pxPerDeg = 2.25;
+        const px = player.position.x;
+        const pz = player.position.z;
+
+        for (const item of compassItems) {
+            let targetDeg = 0;
+            if (item.type === 'tick') {
+                targetDeg = item.fixedDeg;
+            } else if (item.type === 'poi') {
+                if (gameState.zone !== 'outdoor') {
+                    item.el.style.opacity = '0';
+                    continue;
+                }
+                const dx = item.poi.x - px;
+                const dz = item.poi.z - pz;
+                if (Math.hypot(dx, dz) < 2.2) {
+                    item.el.style.opacity = '0';
+                    continue;
+                }
+                targetDeg = ((Math.atan2(dx, -dz) * 180) / Math.PI + 360) % 360;
+            } else if (item.type === 'waypoint') {
+                if (!gameState.waypoint || gameState.zone !== 'outdoor') {
+                    item.el.classList.add('hidden');
+                    continue;
+                }
+                item.el.classList.remove('hidden');
+                const dx = gameState.waypoint.x - px;
+                const dz = gameState.waypoint.z - pz;
+                targetDeg = ((Math.atan2(dx, -dz) * 180) / Math.PI + 360) % 360;
+            }
+
+            const delta = ((targetDeg - deg + 540) % 360) - 180;
+            const posX = winW / 2 + delta * pxPerDeg;
+            if (posX < -10 || posX > winW + 10) {
+                item.el.style.opacity = '0';
+            } else {
+                const edgeFade = Math.min(1, Math.min(posX + 4, winW - posX + 4) / 28);
+                item.el.style.opacity = String(Math.max(0, edgeFade));
+                item.el.style.left = `${posX}px`;
+            }
+        }
+    }
+
+    function drawIslandCartography(ctx, w, h, centerX, centerZ, pxPerUnit, opts = {}) {
+        const { filter = 'all', showLabels = true, isMinimap = false } = opts;
+        const toX = (wx) => w / 2 + (wx - centerX) * pxPerUnit;
+        const toY = (wz) => h / 2 + (wz - centerZ) * pxPerUnit;
+
+        // Turquoise Ocean Backdrop + Gentle Shimmer Rings
+        ctx.fillStyle = '#5BB5D5';
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = Math.max(1, pxPerUnit * 0.25);
+        ctx.beginPath();
+        ctx.arc(toX(0), toY(0), 47.8 * pxPerUnit, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Sandy Beach Island Base (R = 46)
+        ctx.fillStyle = '#F6E2B3';
+        ctx.beginPath();
+        ctx.arc(toX(0), toY(0), 46.0 * pxPerUnit, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Lush Grass Interior (R = 42.5)
+        ctx.fillStyle = '#95D58B';
+        ctx.beginPath();
+        ctx.arc(toX(0), toY(0), 42.5 * pxPerUnit, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Biome Zones (Pine Woods, Orchard, Lighthouse Cliff, Hot Spring)
+        ctx.fillStyle = '#6BA368';
+        ctx.beginPath();
+        ctx.arc(toX(-24.5), toY(-22.0), 12.5 * pxPerUnit, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#B5E48C';
+        ctx.beginPath();
+        ctx.arc(toX(24.0), toY(-19.0), 12.0 * pxPerUnit, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#C9C2BA';
+        ctx.beginPath();
+        ctx.arc(toX(-26.0), toY(23.0), 6.2 * pxPerUnit, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#64DFDF';
+        ctx.beginPath();
+        ctx.arc(toX(30.5), toY(2.0), 2.8 * pxPerUnit, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#9C9288';
+        ctx.lineWidth = Math.max(1.5, pxPerUnit * 0.45);
+        ctx.stroke();
+
+        // Central Village Plaza
+        ctx.fillStyle = '#EDE0D4';
+        ctx.beginPath();
+        ctx.arc(toX(0), toY(0.5), 3.6 * pxPerUnit, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Cobblestone Stepping Trails
+        ctx.fillStyle = '#DDD2C6';
+        for (let i = 0; i < stonePositions.length; i++) {
+            const [sx, sz] = stonePositions[i];
+            ctx.beginPath();
+            ctx.arc(toX(sx), toY(sz), Math.max(1.5, 0.7 * pxPerUnit), 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Village Wooden Pier & Coral Harbor Dock
+        ctx.strokeStyle = '#9C6644';
+        ctx.lineCap = 'butt';
+        ctx.lineWidth = Math.max(3, 2.2 * pxPerUnit);
+        ctx.beginPath();
+        ctx.moveTo(toX(10.0), toY(10.0));
+        ctx.lineTo(toX(13.2), toY(13.2));
+        ctx.stroke();
+
+        ctx.lineWidth = Math.max(4, 3.0 * pxPerUnit);
+        ctx.beginPath();
+        ctx.moveTo(toX(23.0), toY(23.0));
+        ctx.lineTo(toX(28.0), toY(28.0));
+        ctx.stroke();
+
+        // Garden Patch
+        ctx.fillStyle = '#8D6E63';
+        ctx.fillRect(toX(-2.0), toY(-8.6), 6.4 * pxPerUnit, 3.3 * pxPerUnit);
+
+        // 4 Village Houses (Roof swatches)
+        if (filter === 'all' || filter === 'landmarks') {
+            const houses = [
+                { x: -7.2, z: -7.0, col: '#E07A5F', label: 'Home' },
+                { x: 9.6, z: -1.6, col: '#74C69D', label: "Pip's" },
+                { x: -9.8, z: 3.0, col: '#B892FF', label: "Clover's" },
+                { x: 8.4, z: 7.6, col: '#5FA8D3', label: "Barnaby's" }
+            ];
+            houses.forEach(hs => {
+                const sz = Math.max(5, 3.4 * pxPerUnit);
+                ctx.fillStyle = hs.col;
+                ctx.fillRect(toX(hs.x) - sz / 2, toY(hs.z) - sz / 2, sz, sz);
+                ctx.strokeStyle = '#4A352F';
+                ctx.lineWidth = 1.2;
+                ctx.strokeRect(toX(hs.x) - sz / 2, toY(hs.z) - sz / 2, sz, sz);
+                if (showLabels) {
+                    ctx.fillStyle = '#4A352F';
+                    ctx.font = 'bold 10px Nunito, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(hs.label, toX(hs.x), toY(hs.z) - sz / 2 - 4);
+                }
+            });
+        }
+
+        // Activities & Loot Pins
+        if (filter === 'all' || filter === 'activities') {
+            const actPins = [
+                { x: -2.1, z: 2.1, icon: '📌', label: 'Board' },
+                { x: -25.5, z: -22.5, icon: '🪙', label: 'Well' },
+                { x: 25.5, z: -18.5, icon: '🍯', label: 'Apiary' },
+                { x: -27.8, z: 24.8, icon: '🗼', label: 'Lighthouse' },
+                { x: 28.5, z: 2.0, icon: '♨️', label: 'Hot Spring' },
+                { x: 26.2, z: 26.2, icon: '⚓', label: 'Deep Dock' }
+            ];
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            actPins.forEach(p => {
+                ctx.font = isMinimap ? '11px sans-serif' : '15px sans-serif';
+                ctx.fillText(p.icon, toX(p.x), toY(p.z));
+                if (showLabels) {
+                    ctx.font = 'bold 10px Nunito, sans-serif';
+                    ctx.fillStyle = '#4A352F';
+                    ctx.fillText(p.label, toX(p.x), toY(p.z) + 13);
+                }
+            });
+
+            // Active Buried Treasures (Diamond Dots)
+            outdoorInteractables.forEach(it => {
+                if (it.type === 'treasure' && it.data.available) {
+                    ctx.fillStyle = '#FFD166';
+                    ctx.strokeStyle = '#9C6644';
+                    ctx.lineWidth = 1.2;
+                    ctx.beginPath();
+                    ctx.arc(toX(it.pos.x), toY(it.pos.z), isMinimap ? 3.2 : 4.8, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    if (!isMinimap) {
+                        ctx.font = '12px sans-serif';
+                        ctx.fillText('💎', toX(it.pos.x), toY(it.pos.z) - 11);
+                    }
+                }
+            });
+        }
+
+        // Moving Villagers
+        if (filter === 'all' || filter === 'villagers') {
+            Object.values(villagerActors).forEach(v => {
+                const vx = gameState.timeOfDay >= 0.72 && !gameState.festivalActive ? v.homeX : v.curX;
+                const vz = gameState.timeOfDay >= 0.72 && !gameState.festivalActive ? v.homeZ : v.curZ;
+                const npc = gameState.npcs[v.id];
+                ctx.fillStyle = '#FFF9F0';
+                ctx.strokeStyle = '#6F4538';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(toX(vx), toY(vz), isMinimap ? 5.5 : 8.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.font = isMinimap ? '9px sans-serif' : '12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(npc.avatar, toX(vx), toY(vz));
+                if (showLabels) {
+                    ctx.font = 'bold 10px Nunito, sans-serif';
+                    ctx.fillStyle = '#4A352F';
+                    ctx.fillText(npc.name, toX(vx), toY(vz) + 14);
+                }
+            });
+        }
+
+        // Custom Waypoint Pin
+        if (gameState.waypoint) {
+            const wx = toX(gameState.waypoint.x);
+            const wy = toY(gameState.waypoint.z);
+            ctx.strokeStyle = '#FF5400';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(wx, wy, isMinimap ? 7 : 11, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.font = isMinimap ? '12px sans-serif' : '16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('📍', wx, wy - 2);
+        }
+
+        // Player Directional Marker (uses outdoor or savedOutdoorPos when indoors)
+        const pPos = gameState.zone === 'outdoor' ? player.position : gameState.savedOutdoorPos;
+        const pScreenX = toX(pPos.x);
+        const pScreenY = toY(pPos.z);
+        const camForwardAngle = Math.atan2(-Math.cos(cameraAngle), -Math.sin(cameraAngle));
+        const playerFaceAngle = Math.atan2(Math.cos(player.rotation.y), Math.sin(player.rotation.y));
+
+        // Camera View Cone
+        ctx.save();
+        ctx.translate(pScreenX, pScreenY);
+        ctx.rotate(camForwardAngle);
+        ctx.fillStyle = 'rgba(255, 214, 102, 0.34)';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, isMinimap ? 18 : 26, -0.45, 0.45);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        // Player Arrow
+        ctx.save();
+        ctx.translate(pScreenX, pScreenY);
+        ctx.rotate(playerFaceAngle);
+        ctx.fillStyle = '#E07A5F';
+        ctx.strokeStyle = '#FFF9F0';
+        ctx.lineWidth = 2;
+        const r = isMinimap ? 6.5 : 8.5;
+        ctx.beginPath();
+        ctx.moveTo(r, 0);
+        ctx.lineTo(-r * 0.75, -r * 0.7);
+        ctx.lineTo(-r * 0.35, 0);
+        ctx.lineTo(-r * 0.75, r * 0.7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function renderMinimap() {
+        if (!gameState.started || !gameState.minimapVisible) return;
+        const c = document.getElementById('minimap-canvas');
+        if (!c) return;
+        const ctx = c.getContext('2d');
+        const pPos = gameState.zone === 'outdoor' ? player.position : gameState.savedOutdoorPos;
+        drawIslandCartography(ctx, c.width, c.height, pPos.x, pPos.z, 2.3, {
+            filter: 'all',
+            showLabels: false,
+            isMinimap: true
+        });
+    }
+
+    function renderFullMap() {
+        const c = document.getElementById('fullmap-canvas');
+        if (!c) return;
+        const ctx = c.getContext('2d');
+        // Entire 96x96 world fits 540x540 cleanly (pxPerUnit = 540 / 98 = 5.51)
+        drawIslandCartography(ctx, c.width, c.height, 0, 0, 5.51, {
+            filter: gameState.mapFilter,
+            showLabels: true,
+            isMinimap: false
+        });
+
+        const pPos = gameState.zone === 'outdoor' ? player.position : gameState.savedOutdoorPos;
+        const reg = getRegionAt(pPos.x, pPos.z);
+        document.getElementById('map-coords-readout').textContent =
+            `Pos: (${Math.round(pPos.x)}, ${Math.round(pPos.z)}) · ${reg.name}`;
+
+        // Render Region Cards & Fast Travel Sidebar
+        const regList = document.getElementById('map-regions-list');
+        regList.innerHTML = ISLAND_REGIONS.map(r => {
+            const discovered = gameState.discoveredRegions.includes(r.id);
+            const dist = Math.round(Math.hypot(r.x - pPos.x, r.z - pPos.z));
+            const brg = ((Math.atan2(r.x - pPos.x, -(r.z - pPos.z)) * 180) / Math.PI + 360) % 360;
+            const dirLabel = CARDINAL_DIRS[Math.round(brg / 45) % 8];
+            return `
+                <div class="bg-[#F7EDE2] border-2 ${discovered ? 'border-[#D4A373]' : 'border-[#E6CCB2] opacity-85'} rounded-2xl p-2.5 flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="font-cozy font-bold text-xs sm:text-sm text-[#5C3A2E] truncate">${r.icon} ${r.name}</div>
+                        <div class="text-[11px] text-[#7F5548] truncate">${r.desc}</div>
+                        <div class="text-[10px] font-extrabold ${discovered ? 'text-emerald-800' : 'text-amber-800'} mt-0.5">
+                            ${discovered ? `✅ Discovered • ${dist}m ${dirLabel}` : `❔ Unexplored • ${dist}m ${dirLabel}`}
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button data-pin-region="${r.id}" title="Pin Compass Waypoint" class="map-pin-btn cozy-btn px-2 py-1 text-[11px] font-bold text-[#5C3A2E]">
+                            📍 Pin
+                        </button>
+                        ${discovered ? `<button data-travel-region="${r.id}" title="Fast Travel Here" class="map-travel-btn cozy-btn px-2.5 py-1 text-[11px] font-bold bg-[#FCD581] text-[#5C3A2E]">🧭 Go</button>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        document.querySelectorAll('.map-pin-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const regItem = ISLAND_REGIONS.find(x => x.id === btn.getAttribute('data-pin-region'));
+                if (!regItem) return;
+                setCustomWaypoint(regItem.x, regItem.z, regItem.name);
+                audio.playPop();
+                showToast(`Compass pinned to ${regItem.name}! Follow 📍`, '📍');
+                renderFullMap();
+            });
+        });
+        document.querySelectorAll('.map-travel-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                fastTravelToRegion(btn.getAttribute('data-travel-region'));
+            });
+        });
+
+        // Mini Villager Tracker
+        document.getElementById('map-villagers-mini').innerHTML = Object.values(villagerActors).map(v => {
+            const npc = gameState.npcs[v.id];
+            return `
+                <div class="bg-[#FFF9F0] border border-[#E6CCB2] rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2">
+                    <span class="font-bold text-[#5C3A2E]">${npc.avatar} ${npc.name}</span>
+                    <span class="text-[11px] text-[#8D6B5D] truncate">${v.scheduleLabel}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function openMapModal() {
+        const clearBtn = document.getElementById('clear-waypoint-btn');
+        if (clearBtn) {
+            if (gameState.waypoint) clearBtn.classList.remove('hidden');
+            else clearBtn.classList.add('hidden');
+        }
+        renderFullMap();
+        document.getElementById('map-modal').classList.remove('hidden');
+        document.getElementById('map-modal').classList.add('flex');
+    }
+
+    document.getElementById('fullmap-canvas').addEventListener('click', (e) => {
+        const c = e.currentTarget;
+        const rect = c.getBoundingClientRect();
+        const normX = (e.clientX - rect.left) / rect.width - 0.5;
+        const normY = (e.clientY - rect.top) / rect.height - 0.5;
+        const wx = normX * 98;
+        const wz = normY * 98;
+        setCustomWaypoint(wx, wz, 'Custom Pin');
+        audio.playPop();
+        showToast('Dropped 📍 Compass Waypoint Beacon!', '📍');
+        renderFullMap();
+    });
+
+    document.querySelectorAll('.map-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            gameState.mapFilter = btn.getAttribute('data-map-filter');
+            document.querySelectorAll('.map-filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            audio.playUIClick();
+            renderFullMap();
+        });
+    });
+
+    document.getElementById('clear-waypoint-btn').addEventListener('click', () => {
+        audio.playUIClick();
+        clearCustomWaypoint();
+        renderFullMap();
+    });
+
+    // ----------------------------------------------------------------------------
     // 9. HUD BUTTON BINDINGS
     // ----------------------------------------------------------------------------
     function startIslandAdventure() {
@@ -4485,6 +5815,8 @@
         document.getElementById('hud').classList.remove('hidden');
         document.getElementById('guide-banner').classList.remove('hidden');
         updateHUD();
+        updateCompassUI();
+        renderMinimap();
         showToast(`Hey ${gameState.playerName}, Welcome to the Sunbeam World! Step inside your Red-Roof Cottage first.`, '🌻');
     }
 
@@ -4521,9 +5853,12 @@
         }
         const snacks = [
             { key: 'shortcake', gain: 90, icon: '🍰', msg: 'Ate Strawberry Shortcake! +90 Energy ⚡', drink: false },
+            { key: 'crisp', gain: 85, icon: '🍏', msg: 'Ate Honey Apple Crisp! +85 Energy ⚡', drink: false },
             { key: 'pie', gain: 80, icon: '🥧', msg: 'Ate Spiced Pumpkin Pie! +80 Energy ⚡', drink: false },
+            { key: 'soup', gain: 75, icon: '🍲', msg: 'Enjoyed Woodland Mushroom Soup! +75 Energy ⚡', drink: true },
             { key: 'tea', gain: 50, icon: '🍵', msg: 'Sipped warm Berry Tea! +50 Energy ⚡', drink: true },
             { key: 'strawberries', gain: 30, icon: '🍓', msg: 'Ate a sweet Strawberry! +30 Energy ⚡', drink: false },
+            { key: 'apples', gain: 25, icon: '🍎', msg: 'Crunched a Crisp Orchard Apple! +25 Energy ⚡', drink: false },
             { key: 'berries', gain: 25, icon: '🫐', msg: 'Ate Wild Berries! +25 Energy ⚡', drink: false }
         ];
         for (const s of snacks) {
@@ -4562,6 +5897,22 @@
         openSatchelModal();
     });
     document.getElementById('close-satchel-btn').addEventListener('click', closeModalWithClick);
+
+    const handleOpenMapClick = () => {
+        audio.playPaper();
+        openMapModal();
+    };
+    document.getElementById('map-open-btn').addEventListener('click', handleOpenMapClick);
+    document.getElementById('compass-window').addEventListener('click', handleOpenMapClick);
+    document.getElementById('minimap-wrap').addEventListener('click', handleOpenMapClick);
+    document.getElementById('close-map-btn').addEventListener('click', closeModalWithClick);
+    document.getElementById('minimap-toggle-btn').addEventListener('click', (e) => {
+        audio.playUIClick();
+        gameState.minimapVisible = !gameState.minimapVisible;
+        document.getElementById('minimap-wrap').classList.toggle('hidden', !gameState.minimapVisible);
+        e.currentTarget.textContent = gameState.minimapVisible ? 'Hide Radar' : 'Show Radar';
+        if (gameState.minimapVisible) renderMinimap();
+    });
 
     document.getElementById('action-prompt').addEventListener('click', () => {
         if (activeInteractable && !isModalOpen()) {
@@ -4684,7 +6035,17 @@
         streetLanternLights.forEach(l => { l.intensity = isEvening ? 1.25 : 0.25; });
 
         const sunAngle = (t - 0.25) * Math.PI * 2;
-        sunLight.position.set(Math.cos(sunAngle) * 22, Math.max(6, Math.sin(sunAngle) * 24 + 10), 14);
+        const anchorX = gameState.zone === 'outdoor' ? player.position.x : 0;
+        const anchorZ = gameState.zone === 'outdoor' ? player.position.z : 0;
+        sunLight.target.position.set(anchorX, 0, anchorZ);
+        sunLight.position.set(
+            anchorX + Math.cos(sunAngle) * 22,
+            Math.max(6, Math.sin(sunAngle) * 24 + 10),
+            anchorZ + 14
+        );
+        if (rainParticles.visible) {
+            rainParticles.position.set(anchorX, 0, anchorZ);
+        }
 
         const totalHours = Math.floor(t * 24);
         const mins = Math.floor((t * 24 - totalHours) * 60);
@@ -4700,12 +6061,32 @@
     // ----------------------------------------------------------------------------
     let clock = new THREE.Clock();
     let stepTimer = 0;
+    let minimapTimer = 0;
 
     function updateSimulation(dt, elapsed) {
         updateDayNightCycle(dt);
 
         animatedProps.forEach(p => p.update(elapsed, dt));
         ocean.position.y = -0.56 + Math.sin(elapsed * 1.4) * 0.03;
+
+        if (lighthouseBeaconPivot && gameState.zone === 'outdoor') {
+            lighthouseBeaconPivot.rotation.y += dt * 0.85;
+        }
+        if (gameState.zone === 'outdoor') {
+            steamPuffs.forEach(s => {
+                const h = (elapsed * 0.55 + s.phase) % 2.0;
+                s.mesh.position.y = 0.3 + h;
+                s.mesh.position.x = s.baseX + Math.sin(elapsed * 1.4 + s.phase) * 0.18;
+                s.mesh.position.z = s.baseZ + Math.cos(elapsed * 1.2 + s.phase) * 0.18;
+                s.mesh.scale.setScalar(0.85 + h * 0.35);
+                s.mesh.material.opacity = Math.max(0, 0.42 * (1 - h / 2.0));
+            });
+            if (waypointBeacon.visible) {
+                wpOrb.rotation.y += dt * 2.0;
+                wpOrb.position.y = 2.4 + Math.sin(elapsed * 3.2) * 0.28;
+                wpRing.scale.setScalar(1 + Math.sin(elapsed * 4.2) * 0.14);
+            }
+        }
 
         if (gameState.started && !isModalOpen()) {
             updateVillagerRoutines(dt, elapsed);
@@ -4747,7 +6128,7 @@
         });
 
         outdoorInteractables.forEach(item => {
-            if (item.type === 'wood' && item.data.cooldown > 0) {
+            if ((item.type === 'wood' || item.type === 'wishing_well' || item.type === 'hot_spring') && item.data.cooldown > 0) {
                 item.data.cooldown = Math.max(0, item.data.cooldown - dt);
             }
             if (item.type === 'berry' && !item.data.hasBerries) {
@@ -4757,7 +6138,20 @@
                     item.data.berries.forEach(b => b.visible = true);
                 }
             }
-            if (item.type === 'shellfish' && !item.data.available) {
+            if (item.type === 'apple_tree' && !item.data.hasApples) {
+                item.data.timer -= dt;
+                if (item.data.timer <= 0) {
+                    item.data.hasApples = true;
+                    item.data.apples.forEach(ap => { ap.visible = true; });
+                }
+            }
+            if (item.type === 'apiary' && !item.data.available) {
+                item.data.timer -= dt;
+                if (item.data.timer <= 0) {
+                    item.data.available = true;
+                }
+            }
+            if ((item.type === 'shellfish' || item.type === 'mushroom' || item.type === 'treasure') && !item.data.available) {
                 item.data.timer -= dt;
                 if (item.data.timer <= 0) {
                     item.data.available = true;
@@ -4796,8 +6190,12 @@
         const distPlayer = Math.hypot(player.position.x, player.position.z);
         const px = player.position.x;
         const pz = player.position.z;
-        const onPier = !isIndoor && px > 9.5 && pz > 9.5 && Math.abs(px - pz) < 1.8 && (px + pz) < 27.0;
-        const baseGroundY = isIndoor ? 0.0 : (onPier ? 0.42 : (distPlayer > 18.7 ? 0.12 : 0.4));
+        const onVillagePier = !isIndoor && px > 9.5 && pz > 9.5 && Math.abs(px - pz) < 1.8 && (px + pz) < 27.0;
+        const onOuterDock = !isIndoor && px > 22.0 && pz > 22.0 && Math.abs(px - pz) < 2.6 && (px + pz) < 57.5;
+        const onCliff = !isIndoor && Math.hypot(px + 26.0, pz - 23.0) <= 6.2;
+        const targetGroundY = isIndoor ? 0.0 : ((onVillagePier || onOuterDock) ? 0.42 : (onCliff ? 0.68 : (distPlayer > 42.4 ? 0.12 : 0.4)));
+        currentGroundY += (targetGroundY - currentGroundY) * Math.min(1, dt * 14);
+        const baseGroundY = currentGroundY;
         const activeColliders = zoneColliders[gameState.zone] || outdoorColliders;
         const activeList = zoneInteractables[gameState.zone] || outdoorInteractables;
 
@@ -4811,7 +6209,7 @@
             const worldVX = moveX * cos + moveZ * sin;
             const worldVZ = -moveX * sin + moveZ * cos;
 
-            const speed = isIndoor ? 4.6 : 5.8;
+            const speed = isIndoor ? 4.6 : 6.2;
             let nextX = player.position.x + worldVX * speed * dt;
             let nextZ = player.position.z + worldVZ * speed * dt;
 
@@ -4819,11 +6217,11 @@
                 nextX = Math.max(-4.65, Math.min(4.65, nextX));
                 nextZ = Math.max(-3.9, Math.min(4.1, nextZ));
             } else {
-                // Freestyle island bounds covering the full sandy beach & wooden pier
+                // Huge Archipelago bounds covering the entire R=46 sandy shoreline & piers
                 const distFromCenter = Math.hypot(nextX, nextZ);
-                if (distFromCenter > 20.1) {
-                    nextX = (nextX / distFromCenter) * 20.1;
-                    nextZ = (nextZ / distFromCenter) * 20.1;
+                if (distFromCenter > 45.2) {
+                    nextX = (nextX / distFromCenter) * 45.2;
+                    nextZ = (nextZ / distFromCenter) * 45.2;
                 }
             }
 
@@ -4910,6 +6308,24 @@
         } else {
             promptEl.classList.add('hidden');
             targetRing.visible = false;
+        }
+
+        if (!isIndoor && gameState.started) {
+            checkRegionDiscovery(player.position.x, player.position.z);
+            if (gameState.waypoint && Math.hypot(player.position.x - gameState.waypoint.x, player.position.z - gameState.waypoint.z) < 2.6) {
+                const wpName = gameState.waypoint.name;
+                clearCustomWaypoint(true);
+                audio.playChime();
+                showToast(`Arrived at ${wpName}!`, '📍');
+            }
+        }
+        if (gameState.started) {
+            updateCompassUI();
+            minimapTimer += dt;
+            if (minimapTimer >= 0.06) {
+                minimapTimer = 0;
+                renderMinimap();
+            }
         }
 
         const camOffsetX = Math.sin(cameraAngle) * Math.cos(cameraPitch) * cameraDist;
