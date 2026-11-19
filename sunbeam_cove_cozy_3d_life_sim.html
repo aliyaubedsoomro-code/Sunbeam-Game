@@ -1,0 +1,2658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sunbeam Cove - Cozy 3D Life Sim</title>
+    <!-- Tailwind CSS for clean, responsive UI overlays -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Fredoka for cute rounded cozy headings and Nunito for readable UI -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root {
+            --cream: #FFF9F0;
+            --warm-wood: #8D5B4C;
+            --peach: #FFB5A7;
+            --sage: #A8D5BA;
+            --honey: #FCD581;
+            --sky: #A2D2FF;
+            --cocoa: #4A352F;
+        }
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Nunito', sans-serif;
+            background: #87CEEB;
+            color: var(--cocoa);
+        }
+        h1, h2, h3, .font-cozy {
+            font-family: 'Fredoka', sans-serif;
+        }
+        #game-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            z-index: 1;
+            touch-action: none;
+        }
+        /* Cozy UI Cards */
+        .cozy-panel {
+            background: rgba(255, 249, 240, 0.92);
+            backdrop-filter: blur(8px);
+            border: 3px solid #E6CCB2;
+            border-radius: 22px;
+            box-shadow: 0 8px 20px rgba(74, 53, 47, 0.14);
+        }
+        .cozy-btn {
+            background: #FFF9F0;
+            border: 3px solid #D4A373;
+            border-radius: 16px;
+            box-shadow: 0 4px 0 #D4A373;
+            transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
+            cursor: pointer;
+        }
+        .cozy-btn:hover {
+            background: #FFF1DF;
+            transform: translateY(-1px);
+        }
+        .cozy-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #D4A373;
+        }
+        .cozy-btn.active {
+            background: #FCD581;
+            border-color: #C88A2E;
+            box-shadow: 0 4px 0 #C88A2E;
+        }
+        /* Floating Action Prompt */
+        #action-prompt {
+            transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        /* Custom Scrollbar for Quests/Decor */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(230, 204, 178, 0.3);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #D4A373;
+            border-radius: 10px;
+        }
+        /* Animations */
+        @keyframes floatBob {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+        }
+        .animate-bob {
+            animation: floatBob 2.2s ease-in-out infinite;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.85); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: popIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        /* Virtual Joystick for Touch */
+        #joystick-zone {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 3D Viewport Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Start / Welcome Overlay -->
+    <div id="start-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-amber-950/35 backdrop-blur-sm">
+        <div class="cozy-panel max-w-md w-full p-6 sm:p-8 text-center animate-pop">
+            <div class="inline-block px-4 py-1 mb-3 text-xs font-extrabold tracking-wider uppercase rounded-full bg-amber-200 text-amber-900">
+                ✨ Pocket Island Life Sim ✨
+            </div>
+            <h1 class="text-3xl sm:text-4xl font-bold text-[#6F4538] mb-2">Sunbeam Cove</h1>
+            <p class="text-sm sm:text-base text-[#7F5548] mb-5 leading-relaxed">
+                Unwind on your miniature pastel island! Tend flower gardens, fish by the pier, gather sweet berries, chat with Barnaby the Bear, and decorate your cozy campsite.
+            </p>
+            <div class="grid grid-cols-2 gap-2.5 text-left text-xs bg-[#F7EDE2] p-3.5 rounded-2xl mb-6 border-2 border-[#E6CCB2]">
+                <div><span class="font-extrabold">🏃 Move:</span> WASD / Arrows / Drag</div>
+                <div><span class="font-extrabold">✨ Interact:</span> E / Space / Tap Btn</div>
+                <div><span class="font-extrabold">🎥 Camera:</span> Right-Drag / Q & E</div>
+                <div><span class="font-extrabold">🏡 Decorate:</span> Camp Workbench</div>
+            </div>
+            <button id="start-btn" class="cozy-btn w-full py-3.5 px-6 text-lg font-cozy font-bold text-[#5C3A2E] bg-[#FCD581] border-[#D49A3A] shadow-[0_5px_0_#D49A3A] hover:bg-[#FDE09B]">
+                🌻 Step Onto The Island
+            </button>
+        </div>
+    </div>
+
+    <!-- Main HUD Overlay -->
+    <div id="hud" class="fixed inset-0 z-10 pointer-events-none flex flex-col justify-between p-3 sm:p-5 hidden">
+        
+        <!-- Top Row: Time/Weather, Cozy Meter, Quests & Audio -->
+        <div class="flex flex-wrap items-start justify-between gap-2">
+            <!-- Left: Time, Day & Cozy/Energy Bars -->
+            <div class="cozy-panel pointer-events-auto px-3.5 py-2.5 flex flex-col gap-2 min-w-[210px] sm:min-w-[250px]">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <span id="time-icon" class="text-xl">☀️</span>
+                        <div>
+                            <div id="day-text" class="font-cozy font-bold text-sm leading-tight text-[#5C3A2E]">Day 1 • Morning</div>
+                            <div id="clock-text" class="text-xs font-bold text-[#8D6B5D]">08:30 AM</div>
+                        </div>
+                    </div>
+                    <button id="time-toggle-btn" title="Advance Time of Day" class="cozy-btn px-2.5 py-1 text-xs font-bold text-[#6F4538]">
+                        ⏩ Time
+                    </button>
+                </div>
+
+                <!-- Energy & Cozy Vibe Bars -->
+                <div class="space-y-1.5">
+                    <div>
+                        <div class="flex justify-between text-[11px] font-extrabold text-[#6F4538] mb-0.5">
+                            <span>⚡ Energy</span>
+                            <span id="energy-label">100 / 100</span>
+                        </div>
+                        <div class="w-full h-2.5 bg-[#E6CCB2] rounded-full overflow-hidden">
+                            <div id="energy-bar" class="h-full bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full transition-all duration-300" style="width: 100%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-[11px] font-extrabold text-[#6F4538] mb-0.5">
+                            <span>💖 Island Coziness</span>
+                            <span id="cozy-label">Lv. 1 (20%)</span>
+                        </div>
+                        <div class="w-full h-2.5 bg-[#E6CCB2] rounded-full overflow-hidden">
+                            <div id="cozy-bar" class="h-full bg-gradient-to-r from-pink-400 to-amber-300 rounded-full transition-all duration-300" style="width: 20%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Cozy Goals Card & Sound/Decor Buttons -->
+            <div class="flex flex-col items-end gap-2">
+                <div class="flex items-center gap-2 pointer-events-auto">
+                    <button id="neighbors-open-btn" class="cozy-btn px-3 py-2 text-xs sm:text-sm font-cozy font-bold text-[#5C3A2E] flex items-center gap-1.5">
+                        <span>🐾</span><span>Neighbors</span>
+                    </button>
+                    <button id="decor-open-btn" class="cozy-btn px-3 py-2 text-xs sm:text-sm font-cozy font-bold text-[#5C3A2E] flex items-center gap-1.5">
+                        <span>🏕️</span><span>Decorate</span>
+                    </button>
+                    <button id="sound-btn" class="cozy-btn p-2 text-base" title="Toggle Cozy Music & SFX">
+                        🔊
+                    </button>
+                </div>
+
+                <!-- Location Badge -->
+                <div id="location-badge" class="cozy-panel pointer-events-auto px-3 py-1 text-xs font-cozy font-bold text-[#6F4538] flex items-center gap-1.5">
+                    <span>🏝️</span><span>Sunbeam Village</span>
+                </div>
+
+                <!-- Active Tasks Panel -->
+                <div class="cozy-panel pointer-events-auto p-3 max-w-[230px] sm:max-w-[265px]">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="font-cozy font-bold text-xs sm:text-sm text-[#6F4538]">📜 Cozy Wishes</span>
+                        <span id="quest-progress-badge" class="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-[#E8F5E9] text-emerald-800">0/5</span>
+                    </div>
+                    <ul id="quest-list" class="space-y-1.5 text-xs font-semibold text-[#5C3A2E]">
+                        <!-- Populated dynamically -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Floating Toast / Notification Banner -->
+        <div id="toast-container" class="fixed top-28 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2 pointer-events-none w-full max-w-sm px-4"></div>
+
+        <!-- Bottom Row: Context Prompt + Hotbar Inventory + Mobile Controls -->
+        <div class="flex flex-col items-center gap-2.5 w-full">
+            
+            <!-- Contextual Interaction Pill -->
+            <button id="action-prompt" class="pointer-events-auto hidden cozy-btn px-5 py-2.5 bg-[#FFF9F0] border-[#E07A5F] shadow-[0_4px_0_#E07A5F] flex items-center gap-2.5 animate-bob">
+                <span id="prompt-icon" class="text-xl">💧</span>
+                <div class="text-left">
+                    <div id="prompt-title" class="font-cozy font-bold text-sm text-[#5C3A2E]">Water Sprout</div>
+                    <div id="prompt-sub" class="text-[11px] font-bold text-[#9C6658]">Press [E] or Tap</div>
+                </div>
+            </button>
+
+            <!-- Bottom Bar: Mobile Joystick (Left) + Inventory Hotbar (Center) -->
+            <div class="w-full flex items-end justify-between sm:justify-center relative">
+                <!-- Touch Joystick for Mobile/Tablet -->
+                <div id="joystick-zone" class="sm:hidden pointer-events-auto w-24 h-24 rounded-full bg-white/35 border-2 border-white/60 backdrop-blur-sm relative flex items-center justify-center">
+                    <div id="joystick-knob" class="w-10 h-10 rounded-full bg-[#FFF9F0] border-2 border-[#D4A373] shadow-md pointer-events-none"></div>
+                </div>
+
+                <!-- Inventory Hotbar -->
+                <div class="cozy-panel pointer-events-auto px-3 py-2 flex items-center gap-2 sm:gap-3">
+                    <div class="flex items-center gap-1.5 sm:gap-2" id="inventory-slots">
+                        <!-- Generated via JS -->
+                    </div>
+                    <div class="h-8 w-[2px] bg-[#E6CCB2] mx-0.5"></div>
+                    <button id="snack-btn" title="Eat Berry (+25 ⚡) or Drink Berry Tea (+50 ⚡)" class="cozy-btn px-2.5 py-1.5 text-xs font-bold text-[#6F4538] flex flex-col items-center leading-tight">
+                        <span>🍵 Snack</span>
+                        <span class="text-[10px] text-emerald-700">+25~50 ⚡</span>
+                    </button>
+                </div>
+
+                <!-- Spacer for mobile symmetry -->
+                <div class="sm:hidden w-12"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Villager Dialogue Modal (Dynamic for All 4 Neighbors) -->
+    <div id="dialogue-modal" class="fixed inset-0 z-40 hidden items-end sm:items-center justify-center p-4 bg-black/20 backdrop-blur-[2px]">
+        <div class="cozy-panel max-w-lg w-full p-5 sm:p-6 animate-pop mb-16 sm:mb-0">
+            <div class="flex items-center gap-3.5 mb-3">
+                <div id="dialogue-avatar" class="w-14 h-14 rounded-2xl bg-[#FCD581] border-2 border-[#D49A3A] flex items-center justify-center text-3xl shadow-inner">
+                    🐻
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 id="dialogue-name" class="font-cozy font-bold text-xl text-[#5C3A2E]">Barnaby</h3>
+                        <span id="dialogue-role" class="text-xs font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Harbor Fisherman</span>
+                    </div>
+                    <div id="friendship-hearts" class="text-sm tracking-wider">❤️❤️🤍🤍🤍</div>
+                    <div id="dialogue-fav" class="text-[11px] font-bold text-[#8D6B5D]">Loves: 🐟 Sunfish</div>
+                </div>
+            </div>
+            <p id="dialogue-text" class="text-sm sm:text-base font-semibold text-[#5C3A2E] bg-[#F7EDE2] p-4 rounded-2xl border-2 border-[#E6CCB2] mb-4 leading-relaxed">
+                "Hullo there, neighbor!"
+            </p>
+            <div class="flex flex-wrap gap-2 justify-end">
+                <button data-gift="berries" class="gift-item-btn cozy-btn px-3 py-2 text-xs font-bold text-[#5C3A2E] bg-[#FFD6CC] border-[#E07A5F] shadow-[0_3px_0_#E07A5F]">
+                    🍓 Berry (<span id="gift-berries-count">0</span>)
+                </button>
+                <button data-gift="flowers" class="gift-item-btn cozy-btn px-3 py-2 text-xs font-bold text-[#5C3A2E] bg-[#F3D5FF] border-[#B5838D] shadow-[0_3px_0_#B5838D]">
+                    🌸 Flower (<span id="gift-flowers-count">0</span>)
+                </button>
+                <button data-gift="fish" class="gift-item-btn cozy-btn px-3 py-2 text-xs font-bold text-[#5C3A2E] bg-[#BDE0FE] border-[#5FA8D3] shadow-[0_3px_0_#5FA8D3]">
+                    🐟 Fish (<span id="gift-fish-count">0</span>)
+                </button>
+                <button data-gift="tea" class="gift-item-btn cozy-btn px-3 py-2 text-xs font-bold text-[#5C3A2E] bg-[#D8F3DC] border-[#52B788] shadow-[0_3px_0_#52B788]">
+                    🍵 Berry Tea (<span id="gift-tea-count">0</span>)
+                </button>
+                <button id="close-dialogue-btn" class="cozy-btn px-3.5 py-2 text-xs font-bold text-[#5C3A2E]">
+                    👋 Bye
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Neighbors Directory Modal -->
+    <div id="neighbors-modal" class="fixed inset-0 z-40 hidden items-center justify-center p-4 bg-black/25 backdrop-blur-xs">
+        <div class="cozy-panel max-w-lg w-full p-5 sm:p-6 animate-pop max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="font-cozy font-bold text-2xl text-[#5C3A2E]">🐾 Sunbeam Neighbors</h2>
+                    <p class="text-xs font-bold text-[#8D6B5D]">Chat and share favorite gifts around the village!</p>
+                </div>
+                <button id="close-neighbors-btn" class="cozy-btn w-9 h-9 font-bold text-[#5C3A2E]">✕</button>
+            </div>
+            <div id="neighbors-list" class="space-y-2.5 overflow-y-auto pr-1 flex-1">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Camp & Cottage Decorating Workshop Modal -->
+    <div id="decor-modal" class="fixed inset-0 z-40 hidden items-center justify-center p-4 bg-black/25 backdrop-blur-xs">
+        <div class="cozy-panel max-w-lg w-full p-5 sm:p-6 animate-pop max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="font-cozy font-bold text-2xl text-[#5C3A2E]">🏕️ Cozy Decor Workshop</h2>
+                    <p class="text-xs font-bold text-[#8D6B5D]">Craft charming decor for the Village & your Cottage Interior!</p>
+                </div>
+                <button id="close-decor-btn" class="cozy-btn w-9 h-9 font-bold text-[#5C3A2E]">✕</button>
+            </div>
+
+            <div id="decor-items-list" class="space-y-2.5 overflow-y-auto pr-1 flex-1">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Cottage Kitchen Stove Modal -->
+    <div id="kitchen-modal" class="fixed inset-0 z-40 hidden items-center justify-center p-4 bg-black/25 backdrop-blur-xs">
+        <div class="cozy-panel max-w-md w-full p-5 sm:p-6 animate-pop">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="font-cozy font-bold text-2xl text-[#5C3A2E]">🫖 Cottage Hearth Kitchen</h2>
+                    <p class="text-xs font-bold text-[#8D6B5D]">Brew warm treats for energy or gifts!</p>
+                </div>
+                <button id="close-kitchen-btn" class="cozy-btn w-9 h-9 font-bold text-[#5C3A2E]">✕</button>
+            </div>
+            <div class="space-y-2.5">
+                <div class="bg-[#F7EDE2] border-2 border-[#E6CCB2] rounded-2xl p-3 flex items-center justify-between gap-3">
+                    <div>
+                        <div class="font-cozy font-bold text-base text-[#5C3A2E]">🍵 Soothing Berry Tea</div>
+                        <div class="text-xs text-[#7F5548]">Restores +50 ⚡ & Mochi's favorite!</div>
+                        <div class="text-xs font-extrabold text-rose-700 mt-1">Requires: 2 🍓 Berries</div>
+                    </div>
+                    <button id="brew-tea-btn" class="cozy-btn px-3.5 py-2 text-xs font-cozy font-bold bg-[#D8F3DC] border-[#52B788]">
+                        ✨ Brew
+                    </button>
+                </div>
+                <div class="bg-[#F7EDE2] border-2 border-[#E6CCB2] rounded-2xl p-3 flex items-center justify-between gap-3">
+                    <div>
+                        <div class="font-cozy font-bold text-base text-[#5C3A2E]">🍲 Honey Herb Broth</div>
+                        <div class="text-xs text-[#7F5548]">Full Energy restore (+100 ⚡) & +10 💖</div>
+                        <div class="text-xs font-extrabold text-purple-800 mt-1">Requires: 1 🌸 Flower + 1 🐟 Fish</div>
+                    </div>
+                    <button id="cook-broth-btn" class="cozy-btn px-3.5 py-2 text-xs font-cozy font-bold bg-[#FCD581] border-[#D49A3A]">
+                        🍳 Simmer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Smooth Scene Fade Transition Curtain -->
+    <div id="scene-curtain" class="fixed inset-0 z-30 bg-[#FFF9F0] pointer-events-none opacity-0 transition-opacity duration-300"></div>
+
+    <!-- Fishing Mini-Game Overlay -->
+    <div id="fishing-modal" class="fixed inset-0 z-30 hidden items-center justify-center pointer-events-none">
+        <div class="cozy-panel pointer-events-auto p-5 w-72 text-center animate-pop">
+            <div class="text-3xl mb-1 animate-bounce">🎣</div>
+            <h3 class="font-cozy font-bold text-lg text-[#5C3A2E]">Pond Fishing</h3>
+            <p id="fishing-status" class="text-xs font-bold text-[#8D6B5D] mb-3">Wait for a nibble...</p>
+            <div class="w-full h-5 bg-[#E6CCB2] rounded-full overflow-hidden p-1 mb-3 relative">
+                <div id="fishing-zone" class="h-full bg-emerald-400 rounded-full transition-all" style="width: 35%; margin-left: 55%;"></div>
+                <div id="fishing-bobber" class="w-3 h-3 bg-rose-500 rounded-full border-2 border-white absolute top-1 transition-none" style="left: 10%;"></div>
+            </div>
+            <button id="reel-btn" class="cozy-btn w-full py-2.5 font-cozy font-bold text-base bg-[#BDE0FE] border-[#5FA8D3] shadow-[0_4px_0_#5FA8D3] text-[#2B4C65]">
+                🐟 Reel In! [Space/Tap]
+            </button>
+        </div>
+    </div>
+
+    <script>
+    /**
+     * ============================================================================
+     * SUNBEAM COVE - COZY 3D LIFE SIMULATION (VILLAGE & ENTERABLE HOUSE EDITION)
+     * Single-file Three.js + Procedural Web Audio Engine
+     * ============================================================================
+     */
+
+    // ----------------------------------------------------------------------------
+    // 1. COZY PROCEDURAL AUDIO ENGINE (Web Audio API - Zero External Assets)
+    // ----------------------------------------------------------------------------
+    class CozyAudio {
+        constructor() {
+            this.ctx = null;
+            this.muted = false;
+            this.bgmInterval = null;
+            this.noteIndex = 0;
+            this.melody = [349.23, 440.00, 523.25, 587.33, 523.25, 440.00, 392.00, 440.00,
+                           349.23, 523.25, 659.25, 587.33, 523.25, 440.00, 392.00, 349.23];
+        }
+
+        init() {
+            if (!this.ctx) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioCtx();
+            }
+            if (this.ctx.state === 'suspended') {
+                this.ctx.resume();
+            }
+            this.startAmbience();
+        }
+
+        toggleMute() {
+            this.muted = !this.muted;
+            return this.muted;
+        }
+
+        playTone(freq, type = 'sine', duration = 0.25, volume = 0.12, slideTo = null) {
+            if (this.muted || !this.ctx) return;
+            try {
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, now);
+                if (slideTo) {
+                    osc.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
+                }
+                gain.gain.setValueAtTime(0.001, now);
+                gain.gain.linearRampToValueAtTime(volume, now + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + duration + 0.02);
+            } catch (e) {}
+        }
+
+        playStep() {
+            this.playTone(130 + Math.random() * 25, 'triangle', 0.07, 0.04, 90);
+        }
+
+        playDoor() {
+            this.playTone(220, 'triangle', 0.16, 0.12, 330);
+            setTimeout(() => this.playTone(330, 'sine', 0.18, 0.1, 440), 90);
+        }
+
+        playPop() {
+            this.playTone(420, 'sine', 0.14, 0.14, 680);
+        }
+
+        playWater() {
+            this.playTone(520, 'sine', 0.18, 0.12, 780);
+            setTimeout(() => this.playTone(660, 'sine', 0.22, 0.10, 920), 90);
+        }
+
+        playChop() {
+            this.playTone(150, 'triangle', 0.12, 0.18, 65);
+        }
+
+        playSplash() {
+            this.playTone(280, 'sine', 0.28, 0.15, 120);
+            setTimeout(() => this.playTone(520, 'sine', 0.2, 0.12, 740), 110);
+        }
+
+        playChime() {
+            const notes = [523.25, 659.25, 783.99, 1046.50];
+            notes.forEach((n, idx) => {
+                setTimeout(() => this.playTone(n, 'sine', 0.35, 0.11), idx * 85);
+            });
+        }
+
+        playTalk(pitch = 260) {
+            const base = pitch + Math.random() * 55;
+            this.playTone(base, 'triangle', 0.09, 0.1, base * 1.18);
+        }
+
+        startAmbience() {
+            if (this.bgmInterval) return;
+            this.bgmInterval = setInterval(() => {
+                if (this.muted || !this.ctx || document.hidden) return;
+                const freq = this.melody[this.noteIndex % this.melody.length];
+                this.noteIndex++;
+                this.playTone(freq, 'sine', 0.65, 0.032);
+            }, 950);
+        }
+    }
+
+    const audio = new CozyAudio();
+
+    // ----------------------------------------------------------------------------
+    // 2. GAME STATE, VILLAGERS & PROGRESSION DATA
+    // ----------------------------------------------------------------------------
+    const gameState = {
+        started: false,
+        zone: 'outdoor', // 'outdoor' | 'cottage'
+        day: 1,
+        timeOfDay: 0.28,
+        autoTime: true,
+        energy: 100,
+        maxEnergy: 100,
+        cozyScore: 25,
+        activeNpcId: 'barnaby',
+        savedOutdoorPos: { x: -4.2, z: -4.5 },
+        inventory: {
+            berries: 2,
+            wood: 2,
+            flowers: 1,
+            fish: 0,
+            tea: 0
+        },
+        npcs: {
+            barnaby: {
+                id: 'barnaby',
+                name: 'Barnaby',
+                species: 'Bear',
+                avatar: '🐻',
+                role: 'Harbor Fisherman',
+                house: "Blue Boathouse",
+                favItem: 'fish',
+                favLabel: '🐟 Sunfish',
+                friendship: 2,
+                pitch: 210,
+                lines: [
+                    "Hullo there, neighbor! The sea breeze smells like wild strawberries today.",
+                    "My Blue Boathouse by the pier is always stocked with extra tackle if you fancy fishing!",
+                    "Nothing beats watching the golden sunset over Sunbeam Cove with a warm mug of tea."
+                ]
+            },
+            pip: {
+                id: 'pip',
+                name: 'Pip',
+                species: 'Bunny',
+                avatar: '🐰',
+                role: 'Village Baker',
+                house: "Mint-Roof Bakery",
+                favItem: 'berries',
+                favLabel: '🍓 Sweet Berries',
+                friendship: 1,
+                pitch: 340,
+                lines: [
+                    "Hop-hop! Welcome to the Mint Bakery! I'm whipping up fresh berry tarts this morning.",
+                    "If you ever find plump wild berries on the bushes, bring some by—they make the sweetest jam!",
+                    "Isn't the village looking lively with everyone's cottages all lit up?"
+                ]
+            },
+            clover: {
+                id: 'clover',
+                name: 'Clover',
+                species: 'Fox',
+                avatar: '🦊',
+                role: 'Herbalist & Stargazer',
+                house: "Lavender Herb Cabin",
+                favItem: 'flowers',
+                favLabel: '🌸 Wildflowers',
+                friendship: 1,
+                pitch: 295,
+                lines: [
+                    "Greetings, friend! The wildflowers around my Lavender Cabin are humming with gentle magic.",
+                    "Remember to water your garden sprouts—fresh blossoms brighten up any cozy room!",
+                    "At starlight, I love watching fireflies dance near the lanterns."
+                ]
+            },
+            mochi: {
+                id: 'mochi',
+                name: 'Mochi',
+                species: 'Cat',
+                avatar: '🐱',
+                role: 'Sunbeam Poet',
+                house: "Village Plaza Regular",
+                favItem: 'tea',
+                favLabel: '🍵 Berry Tea',
+                friendship: 1,
+                pitch: 320,
+                lines: [
+                    "Mrrrow~ Have you stepped inside your own cottage yet? The hearth fire is wonderfully warm.",
+                    "I wrote a tiny poem about afternoon naps and warm Berry Tea brewed on a cottage stove...",
+                    "Purr... Sunbeam Cove is the coziest little island in the whole wide ocean."
+                ]
+            }
+        },
+        quests: [
+            { id: 'enter_house', text: 'Step inside your Red-Roof Cottage', current: 0, target: 1, done: false },
+            { id: 'water_flowers', text: 'Harvest 2 garden wildflowers', current: 0, target: 2, done: false },
+            { id: 'catch_fish', text: 'Catch a Sunfish at the pier', current: 0, target: 1, done: false },
+            { id: 'gift_neighbor', text: 'Share a gift with any neighbor', current: 0, target: 1, done: false },
+            { id: 'craft_decor', text: 'Craft 1 outdoor or indoor decor item', current: 0, target: 1, done: false }
+        ],
+        decorCatalog: [
+            {
+                id: 'lantern_post',
+                name: 'Warm Firefly Lantern',
+                icon: '🏮',
+                zone: 'outdoor',
+                desc: 'Outdoor • Casts a golden glow along the village path.',
+                cost: { wood: 2, berries: 1 },
+                cozyBonus: 25,
+                built: false
+            },
+            {
+                id: 'picnic_blanket',
+                name: 'Gingham Picnic Set',
+                icon: '🧺',
+                zone: 'outdoor',
+                desc: 'Outdoor • Pastel picnic blanket & pastries on the green.',
+                cost: { berries: 3, flowers: 1 },
+                cozyBonus: 30,
+                built: false
+            },
+            {
+                id: 'flower_arch',
+                name: 'Blossom Garden Arch',
+                icon: '🌸',
+                zone: 'outdoor',
+                desc: 'Outdoor • Blooming floral arch by the garden path.',
+                cost: { wood: 2, flowers: 2 },
+                cozyBonus: 35,
+                built: false
+            },
+            {
+                id: 'starry_rug',
+                name: 'Plush Starry Cottage Rug',
+                icon: '🧶',
+                zone: 'cottage',
+                desc: 'Inside Cottage • A soft pastel woven rug by your hearth.',
+                cost: { flowers: 1, berries: 2 },
+                cozyBonus: 30,
+                built: false
+            },
+            {
+                id: 'cozy_armchair',
+                name: 'Reading Armchair & Lamp',
+                icon: '🛋️',
+                zone: 'cottage',
+                desc: 'Inside Cottage • Comfy armchair beside your bookshelf.',
+                cost: { wood: 2, flowers: 1 },
+                cozyBonus: 35,
+                built: false
+            },
+            {
+                id: 'gramophone',
+                name: 'Brass Cozy Gramophone',
+                icon: ' Gramophone'.replace(' ', '📻'),
+                zone: 'cottage',
+                desc: 'Inside Cottage • Plays warm acoustic melodies indoors.',
+                cost: { wood: 3, fish: 1 },
+                cozyBonus: 40,
+                built: false
+            }
+        ],
+        fishing: {
+            active: false,
+            progress: 0.1,
+            dir: 1,
+            targetStart: 0.55,
+            targetWidth: 0.32
+        }
+    };
+
+    // ----------------------------------------------------------------------------
+    // 3. THREE.JS SCENE, RENDERER, LIGHTING & CAMERA SETUP
+    // ----------------------------------------------------------------------------
+    const canvas = document.getElementById('game-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xAEE2FF);
+    scene.fog = new THREE.FogExp2(0xC9ECFF, 0.013);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 160);
+    let cameraAngle = Math.PI * 0.25;
+    let cameraPitch = 0.62;
+    let cameraDist = 16.0;
+
+    // Warm Stylized Lighting
+    const hemiLight = new THREE.HemisphereLight(0xFFF6E5, 0x7FB069, 0.85);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(0xFFE8C2, 1.35);
+    sunLight.position.set(18, 26, 16);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 2;
+    sunLight.shadow.camera.far = 75;
+    const d = 26;
+    sunLight.shadow.camera.left = -d;
+    sunLight.shadow.camera.right = d;
+    sunLight.shadow.camera.top = d;
+    sunLight.shadow.camera.bottom = -d;
+    sunLight.shadow.bias = -0.0005;
+    scene.add(sunLight);
+
+    // ----------------------------------------------------------------------------
+    // 4. WORLD GROUPS (OUTDOOR VILLAGE GROUP + INDOOR COTTAGE INTERIOR GROUP)
+    // ----------------------------------------------------------------------------
+    const outdoorWorld = new THREE.Group();
+    const cottageInteriorWorld = new THREE.Group();
+    cottageInteriorWorld.visible = false;
+    scene.add(outdoorWorld);
+    scene.add(cottageInteriorWorld);
+
+    const outdoorInteractables = [];
+    const cottageInteractables = [];
+    const outdoorColliders = [];
+    const cottageColliders = [];
+    const animatedProps = [];
+    const decorMeshes = {};
+    const streetLanternLights = [];
+
+    function mat(color, roughness = 0.85, emissive = 0x000000, emissiveIntensity = 0) {
+        return new THREE.MeshStandardMaterial({
+            color,
+            roughness,
+            metalness: 0.04,
+            emissive,
+            emissiveIntensity
+        });
+    }
+
+    // ----------------------------------------------------------------------------
+    // 4A. EXPANDED SUNBEAM VILLAGE ISLAND TERRAIN & PATHS
+    // ----------------------------------------------------------------------------
+    const ocean = new THREE.Mesh(
+        new THREE.CircleGeometry(110, 48),
+        new THREE.MeshStandardMaterial({
+            color: 0x6EC6E6,
+            roughness: 0.25,
+            metalness: 0.1,
+            transparent: true,
+            opacity: 0.92
+        })
+    );
+    ocean.rotation.x = -Math.PI / 2;
+    ocean.position.y = -0.55;
+    outdoorWorld.add(ocean);
+
+    // Expanded Island Radius (20.5 sand, 18.8 grass) to comfortably fit 4 houses & village square
+    const sandBase = new THREE.Mesh(new THREE.CylinderGeometry(20.5, 22.0, 0.9, 44), mat(0xF6E2B3, 0.95));
+    sandBase.position.y = -0.35;
+    sandBase.receiveShadow = true;
+    outdoorWorld.add(sandBase);
+
+    const grassTop = new THREE.Mesh(new THREE.CylinderGeometry(18.8, 20.0, 0.7, 44), mat(0x95D58B, 0.9));
+    grassTop.position.y = 0.05;
+    grassTop.receiveShadow = true;
+    outdoorWorld.add(grassTop);
+
+    // Central Cozy Village Plaza Circle
+    const plaza = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.6, 0.08, 28), mat(0xEDE0D4, 0.92));
+    plaza.position.set(0, 0.41, 0.5);
+    plaza.receiveShadow = true;
+    outdoorWorld.add(plaza);
+
+    // Winding Cobblestone Paths connecting all 4 houses, garden, and pier
+    const stonePositions = [
+        // To Player's Red Cottage (North-West)
+        [-1.8, -1.5], [-3.0, -2.7], [-4.2, -3.9], [-5.2, -5.0],
+        // To Pip's Mint Bakery (East)
+        [2.5, 0.2], [4.2, -0.3], [5.9, -0.8], [7.5, -1.2],
+        // To Clover's Lavender Cabin (West)
+        [-2.8, 1.2], [-4.6, 1.8], [-6.4, 2.3], [-8.0, 2.6],
+        // To Captain Barnaby's Boathouse & Pier (South-East)
+        [1.8, 2.6], [3.3, 4.1], [4.8, 5.6], [6.4, 7.1], [7.9, 8.5],
+        // To Garden Patch (North-East)
+        [0.4, -2.2], [0.8, -3.8], [1.0, -5.2]
+    ];
+    stonePositions.forEach(([sx, sz], i) => {
+        const stone = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.55 + (i % 2) * 0.14, 0.68, 0.12, 7),
+            mat(0xDDD2C6, 0.92)
+        );
+        stone.position.set(sx, 0.42, sz);
+        stone.rotation.y = i * 0.85;
+        stone.receiveShadow = true;
+        outdoorWorld.add(stone);
+    });
+
+    // Cute Village Street Lamps
+    function addStreetLamp(x, z) {
+        const lamp = new THREE.Group();
+        lamp.position.set(x, 0.4, z);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 2.2, 8), mat(0x5C3A2E));
+        pole.position.y = 1.1;
+        pole.castShadow = true;
+        lamp.add(pole);
+
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.25, 6), mat(0x5C3A2E));
+        cap.position.y = 2.3;
+        lamp.add(cap);
+
+        const glow = new THREE.Mesh(
+            new THREE.SphereGeometry(0.18, 10, 10),
+            mat(0xFFE599, 0.2, 0xFFBE0B, 0.7)
+        );
+        glow.position.y = 2.1;
+        lamp.add(glow);
+
+        const pLight = new THREE.PointLight(0xFFD166, 0.7, 7);
+        pLight.position.y = 2.1;
+        lamp.add(pLight);
+        streetLanternLights.push(pLight);
+
+        outdoorWorld.add(lamp);
+        outdoorColliders.push({ x, z, r: 0.35 });
+    }
+    addStreetLamp(-2.5, -1.0);
+    addStreetLamp(3.2, -1.4);
+    addStreetLamp(-3.6, 2.7);
+    addStreetLamp(4.2, 4.8);
+
+    // ----------------------------------------------------------------------------
+    // 4B. REUSABLE STYLIZED HOUSE BUILDER + 4 DISTINCT VILLAGE HOUSES!
+    // ----------------------------------------------------------------------------
+    function createVillageHouse(opts) {
+        const {
+            x, z, rotY = 0,
+            wallColor = 0xFFF6E9,
+            roofColor = 0xE07A5F,
+            trimColor = 0x9C6644,
+            doorColor = 0xB07D62,
+            scale = 1,
+            hasSmoke = true,
+            mailboxColor = 0xE07A5F,
+            flowerBoxColor = null,
+            awningColor = null
+        } = opts;
+
+        const house = new THREE.Group();
+        house.position.set(x, 0.4, z);
+        house.rotation.y = rotY;
+        house.scale.setScalar(scale);
+
+        // Main Walls
+        const walls = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2.5, 3.2), mat(wallColor));
+        walls.position.y = 1.25;
+        walls.castShadow = true;
+        walls.receiveShadow = true;
+        house.add(walls);
+
+        // Corner Timber Beams
+        const beamMat = mat(trimColor);
+        [[-1.85, -1.55], [1.85, -1.55], [-1.85, 1.55], [1.85, 1.55]].forEach(([bx, bz]) => {
+            const beam = new THREE.Mesh(new THREE.BoxGeometry(0.24, 2.55, 0.24), beamMat);
+            beam.position.set(bx, 1.25, bz);
+            beam.castShadow = true;
+            house.add(beam);
+        });
+
+        // Pitched Pyramid Roof
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(3.15, 1.9, 4), mat(roofColor));
+        roof.position.y = 3.35;
+        roof.rotation.y = Math.PI / 4;
+        roof.castShadow = true;
+        house.add(roof);
+
+        // Chimney + Optional Smoke
+        const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.3, 0.55), mat(0xC9ADA7));
+        chimney.position.set(1.0, 3.6, -0.5);
+        chimney.castShadow = true;
+        house.add(chimney);
+
+        if (hasSmoke) {
+            for (let i = 0; i < 3; i++) {
+                const puff = new THREE.Mesh(new THREE.SphereGeometry(0.2 + i * 0.05, 8, 8), mat(0xFFFFFF, 0.9));
+                puff.position.set(1.0, 4.4 + i * 0.45, -0.5);
+                house.add(puff);
+                animatedProps.push({
+                    mesh: puff,
+                    update: (t) => {
+                        const phase = (t * 0.65 + i * 0.33 + x) % 1;
+                        puff.position.y = 4.35 + phase * 1.5;
+                        puff.position.x = 1.0 + Math.sin(t * 2 + i) * 0.16;
+                        const s = Math.sin(phase * Math.PI);
+                        puff.scale.setScalar(Math.max(0.01, s));
+                    }
+                });
+            }
+        }
+
+        // Front Wooden Door + Brass Doorknob
+        const door = new THREE.Mesh(new THREE.BoxGeometry(0.98, 1.6, 0.16), mat(doorColor));
+        door.position.set(0, 0.8, 1.6);
+        house.add(door);
+
+        const knob = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), mat(0xFFD166, 0.3));
+        knob.position.set(0.32, 0.8, 1.7);
+        house.add(knob);
+
+        // Welcome Doormat
+        const doormat = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.06, 0.65), mat(0xD4A373));
+        doormat.position.set(0, 0.03, 1.98);
+        doormat.receiveShadow = true;
+        house.add(doormat);
+
+        // Warm Glowing Windows
+        const winMat = mat(0xFFE599, 0.4, 0xFFCC4D, 0.55);
+        [-1.12, 1.12].forEach(wx => {
+            const win = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.66, 0.15), winMat);
+            win.position.set(wx, 1.38, 1.6);
+            house.add(win);
+
+            if (flowerBoxColor) {
+                const box = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.2, 0.25), mat(0x8D5B4C));
+                box.position.set(wx, 0.96, 1.72);
+                house.add(box);
+                const blooms = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.16, 0.2), mat(flowerBoxColor));
+                blooms.position.set(wx, 1.1, 1.72);
+                house.add(blooms);
+            }
+        });
+
+        // Optional Cafe/Bakery Awning
+        if (awningColor) {
+            const awning = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.14, 0.85), mat(awningColor));
+            awning.position.set(0, 1.92, 1.95);
+            awning.rotation.x = 0.28;
+            awning.castShadow = true;
+            house.add(awning);
+        }
+
+        // Cute Mailbox beside front path
+        const mbPost = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.95, 8), mat(0x8D5B4C));
+        mbPost.position.set(1.65, 0.48, 2.05);
+        house.add(mbPost);
+        const mbBox = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.26, 0.46), mat(mailboxColor));
+        mbBox.position.set(1.65, 0.98, 2.05);
+        mbBox.castShadow = true;
+        house.add(mbBox);
+
+        outdoorWorld.add(house);
+        outdoorColliders.push({ x, z, r: 2.35 * scale });
+        return house;
+    }
+
+    // HOUSE 1: Player's Enterable Red-Roof Cottage (North-West)
+    createVillageHouse({
+        x: -7.2, z: -7.0, rotY: Math.PI * 0.22,
+        wallColor: 0xFFF6E9, roofColor: 0xE07A5F,
+        flowerBoxColor: 0xFF8FAB, mailboxColor: 0xE07A5F
+    });
+
+    // Enterable Door Trigger for Player's Cottage!
+    outdoorInteractables.push({
+        id: 'enter_player_cottage',
+        type: 'enter_house',
+        pos: new THREE.Vector3(-5.5, 0.4, -5.3),
+        radius: 2.15,
+        label: 'Enter Your Cottage',
+        sub: 'Step inside your cozy home!',
+        icon: '🚪'
+    });
+
+    // Crafting Workbench next to Player's Cottage
+    const bench = new THREE.Group();
+    bench.position.set(-10.2, 0.4, -4.4);
+    const benchTop = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.18, 0.85), mat(0xC68B59));
+    benchTop.position.y = 0.85;
+    benchTop.castShadow = true;
+    bench.add(benchTop);
+    [[-0.6, -0.3], [0.6, -0.3], [-0.6, 0.3], [0.6, 0.3]].forEach(([lx, lz]) => {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.85, 0.14), mat(0x8D5B4C));
+        leg.position.set(lx, 0.425, lz);
+        bench.add(leg);
+    });
+    outdoorWorld.add(bench);
+    outdoorColliders.push({ x: -10.2, z: -4.4, r: 0.95 });
+
+    outdoorInteractables.push({
+        id: 'workbench',
+        type: 'workbench',
+        pos: new THREE.Vector3(-10.2, 0.4, -4.4),
+        radius: 2.2,
+        label: 'Camp & Home Workbench',
+        sub: 'Craft outdoor & indoor decor',
+        icon: '🔨'
+    });
+
+    // HOUSE 2: Pip's Mint-Roof Bakery & Tea House (East)
+    createVillageHouse({
+        x: 10.6, z: -2.2, rotY: -Math.PI * 0.42,
+        wallColor: 0xFFFDF7, roofColor: 0x74C69D,
+        awningColor: 0xFFB5A7, mailboxColor: 0x74C69D,
+        scale: 0.96
+    });
+
+    // Outdoor Pastry Display Table in front of Pip's Bakery
+    const pastryTable = new THREE.Group();
+    pastryTable.position.set(8.2, 0.4, -3.2);
+    const ptBase = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.75, 0.8), mat(0xE6CCB2));
+    ptBase.position.y = 0.375;
+    ptBase.castShadow = true;
+    pastryTable.add(ptBase);
+    [[-0.35, 0xFF8FAB], [0.0, 0xFCD581], [0.35, 0xBDB2FF]].forEach(([px, col]) => {
+        const tart = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.12, 10), mat(col));
+        tart.position.set(px, 0.81, 0);
+        pastryTable.add(tart);
+    });
+    outdoorWorld.add(pastryTable);
+    outdoorColliders.push({ x: 8.2, z: -3.2, r: 0.85 });
+
+    outdoorInteractables.push({
+        id: 'pip_bakery_sign',
+        type: 'inspect',
+        pos: new THREE.Vector3(8.5, 0.4, -1.8),
+        radius: 1.9,
+        label: "Pip's Mint Bakery",
+        sub: 'Smells like warm strawberry tarts!',
+        icon: '🧁',
+        msg: "Pip's Mint Bakery: Freshly baked berry tarts cooling on the sill!"
+    });
+
+    // HOUSE 3: Clover's Lavender-Roof Herb & Flower Cabin (West)
+    createVillageHouse({
+        x: -10.8, z: 3.2, rotY: Math.PI * 0.48,
+        wallColor: 0xFAF3DD, roofColor: 0xB892FF,
+        flowerBoxColor: 0xFCD581, mailboxColor: 0xB892FF,
+        scale: 0.94
+    });
+
+    outdoorInteractables.push({
+        id: 'clover_cabin_sign',
+        type: 'inspect',
+        pos: new THREE.Vector3(-8.6, 0.4, 3.0),
+        radius: 1.9,
+        label: "Clover's Herb Cabin",
+        sub: 'Drying bundles of lavender & chamomile',
+        icon: '🌿',
+        msg: "Clover's Lavender Cabin: Wind chimes tinkle softly above blooming herb boxes."
+    });
+
+    // HOUSE 4: Captain Barnaby's Blue-Roof Boathouse (South-East near Pier)
+    createVillageHouse({
+        x: 6.4, z: 10.6, rotY: -Math.PI * 0.72,
+        wallColor: 0xF1FAEE, roofColor: 0x5FA8D3,
+        trimColor: 0x457B9D, mailboxColor: 0x5FA8D3,
+        scale: 0.92
+    });
+
+    outdoorInteractables.push({
+        id: 'barnaby_boathouse_sign',
+        type: 'inspect',
+        pos: new THREE.Vector3(5.6, 0.4, 8.6),
+        radius: 1.9,
+        label: "Barnaby's Boathouse",
+        sub: 'Coiled ropes, brass compass & oars',
+        icon: '⚓',
+        msg: "Captain Barnaby's Boathouse: 'Gone fishin' by the wooden pier!'"
+    });
+
+    // ----------------------------------------------------------------------------
+    // 4C. ENTERABLE PLAYER COTTAGE INTERIOR SCENE!
+    // ----------------------------------------------------------------------------
+    const interiorDecorMeshes = {};
+
+    function buildCottageInterior() {
+        // Warm Honey-Oak Floorboards
+        const floor = new THREE.Mesh(new THREE.BoxGeometry(10.5, 0.3, 9.0), mat(0xC68B59, 0.85));
+        floor.position.y = -0.15;
+        floor.receiveShadow = true;
+        cottageInteriorWorld.add(floor);
+
+        // Cream & Sage Wainscoting Walls (Back & Left/Right cutaway diorama style)
+        const wallMat = mat(0xFFF6E9, 0.9);
+        const trimMat = mat(0x95D5B2, 0.85);
+
+        const backWall = new THREE.Mesh(new THREE.BoxGeometry(10.5, 4.2, 0.3), wallMat);
+        backWall.position.set(0, 2.1, -4.5);
+        backWall.receiveShadow = true;
+        cottageInteriorWorld.add(backWall);
+
+        const backTrim = new THREE.Mesh(new THREE.BoxGeometry(10.5, 1.1, 0.34), trimMat);
+        backTrim.position.set(0, 0.55, -4.48);
+        cottageInteriorWorld.add(backTrim);
+
+        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4.2, 9.0), wallMat);
+        leftWall.position.set(-5.25, 2.1, 0);
+        leftWall.receiveShadow = true;
+        cottageInteriorWorld.add(leftWall);
+
+        const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4.2, 9.0), wallMat);
+        rightWall.position.set(5.25, 2.1, 0);
+        rightWall.receiveShadow = true;
+        cottageInteriorWorld.add(rightWall);
+
+        // Warm Interior Ceiling/Hearth Point Light
+        const hearthLight = new THREE.PointLight(0xFFBE55, 1.35, 16);
+        hearthLight.position.set(0, 2.4, -2.5);
+        cottageInteriorWorld.add(hearthLight);
+
+        // Sunlit Window on Back Wall
+        const winFrame = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.5, 0.16), mat(0x8D5B4C));
+        winFrame.position.set(-2.4, 2.3, -4.32);
+        cottageInteriorWorld.add(winFrame);
+        const winPane = new THREE.Mesh(
+            new THREE.BoxGeometry(1.55, 1.25, 0.18),
+            mat(0xFFF3B0, 0.2, 0xFFE169, 0.75)
+        );
+        winPane.position.set(-2.4, 2.3, -4.3);
+        cottageInteriorWorld.add(winPane);
+
+        // Brick Hearth & Crackling Fireplace (Center Back)
+        const fireplace = new THREE.Group();
+        fireplace.position.set(0, 0, -4.0);
+        const mantle = new THREE.Mesh(new THREE.BoxGeometry(2.1, 1.8, 0.75), mat(0xBC6C25));
+        mantle.position.y = 0.9;
+        mantle.castShadow = true;
+        fireplace.add(mantle);
+
+        const firebox = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.95, 0.5), mat(0x3D2C2E));
+        firebox.position.set(0, 0.48, 0.18);
+        fireplace.add(firebox);
+
+        const flame = new THREE.Mesh(
+            new THREE.ConeGeometry(0.32, 0.65, 8),
+            mat(0xFF9F1C, 0.3, 0xFF5400, 0.95)
+        );
+        flame.position.set(0, 0.42, 0.22);
+        fireplace.add(flame);
+        animatedProps.push({
+            mesh: flame,
+            update: (t) => {
+                flame.scale.set(1 + Math.sin(t * 11) * 0.12, 1 + Math.cos(t * 14) * 0.18, 1);
+                hearthLight.intensity = 1.25 + Math.sin(t * 9) * 0.15;
+            }
+        });
+        cottageInteriorWorld.add(fireplace);
+        cottageColliders.push({ x: 0, z: -4.0, r: 1.05 });
+
+        // Soft Quilt Bed (Left Corner)
+        const bed = new THREE.Group();
+        bed.position.set(-3.5, 0, -2.5);
+        const bedFrame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.55, 3.0), mat(0x8D5B4C));
+        bedFrame.position.y = 0.28;
+        bedFrame.castShadow = true;
+        bed.add(bedFrame);
+
+        const mattress = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.35, 2.8), mat(0xFFF9F0));
+        mattress.position.y = 0.65;
+        bed.add(mattress);
+
+        const quilt = new THREE.Mesh(new THREE.BoxGeometry(2.04, 0.38, 1.9), mat(0xFFB5A7));
+        quilt.position.set(0, 0.66, 0.42);
+        bed.add(quilt);
+
+        const pillow = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.22, 0.55), mat(0xFCD581));
+        pillow.position.set(0, 0.88, -0.95);
+        bed.add(pillow);
+        cottageInteriorWorld.add(bed);
+        cottageColliders.push({ x: -3.5, z: -2.5, r: 1.45 });
+
+        cottageInteractables.push({
+            id: 'indoor_bed',
+            type: 'rest',
+            pos: new THREE.Vector3(-2.1, 0, -2.2),
+            radius: 1.85,
+            label: 'Cozy Quilt Bed',
+            sub: 'Nap to restore full Energy ⚡',
+            icon: '🛌'
+        });
+
+        // Cottage Hearth Kitchen Stove & Kettle (Right Side)
+        const kitchen = new THREE.Group();
+        kitchen.position.set(3.5, 0, -3.2);
+        const counter = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 1.1), mat(0xE6CCB2));
+        counter.position.y = 0.5;
+        counter.castShadow = true;
+        kitchen.add(counter);
+
+        const kettle = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 12), mat(0xE07A5F, 0.3));
+        kettle.position.set(-0.4, 1.18, 0);
+        kitchen.add(kettle);
+
+        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.24, 0.24, 12), mat(0x74C69D));
+        pot.position.set(0.45, 1.12, 0);
+        kitchen.add(pot);
+        cottageInteriorWorld.add(kitchen);
+        cottageColliders.push({ x: 3.5, z: -3.2, r: 1.15 });
+
+        cottageInteractables.push({
+            id: 'indoor_kitchen',
+            type: 'kitchen',
+            pos: new THREE.Vector3(3.2, 0, -2.1),
+            radius: 1.9,
+            label: 'Cottage Hearth Stove',
+            sub: 'Brew Berry Tea & warm treats',
+            icon: '🫖'
+        });
+
+        // Wooden Bookshelf (Right Wall)
+        const shelf = new THREE.Group();
+        shelf.position.set(4.55, 0, 0.4);
+        const shelfBody = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.4, 1.6), mat(0x9C6644));
+        shelfBody.position.y = 1.2;
+        shelfBody.castShadow = true;
+        shelf.add(shelfBody);
+        cottageInteriorWorld.add(shelf);
+        cottageColliders.push({ x: 4.55, z: 0.4, r: 0.85 });
+
+        // Front Exit Doormat (South Center)
+        const exitMat = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.06, 1.0), mat(0xE07A5F));
+        exitMat.position.set(0, 0.03, 3.8);
+        cottageInteriorWorld.add(exitMat);
+
+        cottageInteractables.push({
+            id: 'exit_player_cottage',
+            type: 'exit_house',
+            pos: new THREE.Vector3(0, 0, 3.6),
+            radius: 1.85,
+            label: 'Step Outside',
+            sub: 'Return to Sunbeam Village',
+            icon: '🌻'
+        });
+
+        // --- Craftable Indoor Decor Meshes (Hidden until crafted) ---
+        // 1. Starry Cottage Rug
+        const rug = new THREE.Mesh(new THREE.CylinderGeometry(1.65, 1.65, 0.05, 24), mat(0xBDB2FF));
+        rug.position.set(0, 0.03, -0.5);
+        rug.visible = false;
+        cottageInteriorWorld.add(rug);
+        interiorDecorMeshes['starry_rug'] = rug;
+
+        // 2. Cozy Reading Armchair
+        const chair = new THREE.Group();
+        chair.position.set(2.8, 0, 1.2);
+        chair.rotation.y = -0.6;
+        const seat = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.55, 1.0), mat(0xFCD581));
+        seat.position.y = 0.28;
+        seat.castShadow = true;
+        chair.add(seat);
+        const back = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.95, 0.25), mat(0xFCD581));
+        back.position.set(0, 0.65, -0.38);
+        chair.add(back);
+        chair.visible = false;
+        cottageInteriorWorld.add(chair);
+        interiorDecorMeshes['cozy_armchair'] = chair;
+
+        // 3. Brass Gramophone
+        const gram = new THREE.Group();
+        gram.position.set(-3.8, 0, 1.6);
+        const table = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.75, 12), mat(0x8D5B4C));
+        table.position.y = 0.375;
+        gram.add(table);
+        const horn = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.45, 12), mat(0xFFD166, 0.3));
+        horn.position.set(0, 1.05, 0);
+        horn.rotation.z = -0.5;
+        gram.add(horn);
+        gram.visible = false;
+        cottageInteriorWorld.add(gram);
+        interiorDecorMeshes['gramophone'] = gram;
+    }
+    buildCottageInterior();
+
+    // ----------------------------------------------------------------------------
+    // 4D. GARDENING PATCH (4 Interactive Flower Plots)
+    // ----------------------------------------------------------------------------
+    const flowerColors = [0xFF8FAB, 0xFCD581, 0xBDB2FF, 0xFFADAD];
+    const gardenPlots = [];
+
+    function buildGarden() {
+        const plotCoords = [
+            [0.2, -7.8], [2.0, -7.8],
+            [0.2, -6.0], [2.0, -6.0]
+        ];
+
+        plotCoords.forEach(([px, pz], idx) => {
+            const group = new THREE.Group();
+            group.position.set(px, 0.4, pz);
+
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.25, 1.45), mat(0xB07D62));
+            frame.position.y = 0.12;
+            frame.receiveShadow = true;
+            frame.castShadow = true;
+            group.add(frame);
+
+            const soilMat = mat(0x8D6E63, 0.95);
+            const soil = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.28, 1.25), soilMat);
+            soil.position.y = 0.14;
+            soil.receiveShadow = true;
+            group.add(soil);
+
+            const plantGroup = new THREE.Group();
+            plantGroup.position.y = 0.28;
+
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.65, 8), mat(0x52B788));
+            stem.position.y = 0.32;
+            plantGroup.add(stem);
+
+            const leafL = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), mat(0x74C69D));
+            leafL.scale.set(1.4, 0.4, 0.8);
+            leafL.position.set(-0.16, 0.25, 0);
+            plantGroup.add(leafL);
+
+            const leafR = leafL.clone();
+            leafR.position.set(0.16, 0.32, 0);
+            plantGroup.add(leafR);
+
+            const blossomGroup = new THREE.Group();
+            blossomGroup.position.y = 0.68;
+            const petalColor = flowerColors[idx % flowerColors.length];
+            for (let p = 0; p < 5; p++) {
+                const ang = (p / 5) * Math.PI * 2;
+                const petal = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), mat(petalColor));
+                petal.position.set(Math.cos(ang) * 0.18, 0, Math.sin(ang) * 0.18);
+                petal.scale.set(1, 0.6, 1);
+                blossomGroup.add(petal);
+            }
+            const center = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), mat(0xFFE169));
+            blossomGroup.add(center);
+            blossomGroup.visible = false;
+            plantGroup.add(blossomGroup);
+
+            plantGroup.scale.setScalar(0.55);
+            group.add(plantGroup);
+            outdoorWorld.add(group);
+
+            const plotData = {
+                index: idx,
+                stage: idx === 0 ? 1 : 0,
+                growTimer: 0,
+                soilMat,
+                plantGroup,
+                blossomGroup
+            };
+            if (idx === 0) {
+                soilMat.color.setHex(0x5D4037);
+                plantGroup.scale.setScalar(0.85);
+            }
+            gardenPlots.push(plotData);
+
+            outdoorInteractables.push({
+                id: `plot_${idx}`,
+                type: 'garden',
+                pos: new THREE.Vector3(px, 0.4, pz),
+                radius: 1.55,
+                label: 'Water Flower Sprout',
+                sub: 'Costs 5 ⚡ • Grows cozy blossoms',
+                icon: '💧',
+                data: plotData
+            });
+        });
+    }
+    buildGarden();
+
+    // ----------------------------------------------------------------------------
+    // 4E. FISHING COVE & WOODEN PIER
+    // ----------------------------------------------------------------------------
+    function buildPier() {
+        const pier = new THREE.Group();
+        pier.position.set(10.6, 0.35, 10.6);
+        pier.rotation.y = Math.PI * 0.25;
+
+        for (let i = 0; i < 6; i++) {
+            const plank = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.14, 0.55), mat(0xB07D62));
+            plank.position.set(0, 0.05, i * 0.65);
+            plank.castShadow = true;
+            plank.receiveShadow = true;
+            pier.add(plank);
+        }
+
+        [[-0.95, 0.4], [0.95, 0.4], [-0.95, 3.2], [0.95, 3.2]].forEach(([px, pz]) => {
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.3, 8), mat(0x7F5539));
+            post.position.set(px, 0.1, pz);
+            post.castShadow = true;
+            pier.add(post);
+        });
+
+        const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.35, 10), mat(0xE07A5F));
+        bucket.position.set(-0.65, 0.28, 2.8);
+        pier.add(bucket);
+
+        outdoorWorld.add(pier);
+
+        const fishRing = new THREE.Mesh(
+            new THREE.RingGeometry(0.35, 0.48, 20),
+            new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+        );
+        fishRing.rotation.x = -Math.PI / 2;
+        fishRing.position.set(14.0, -0.5, 14.0);
+        outdoorWorld.add(fishRing);
+
+        animatedProps.push({
+            mesh: fishRing,
+            update: (t) => {
+                const s = 1 + Math.sin(t * 3) * 0.22;
+                fishRing.scale.setScalar(s);
+                fishRing.position.x = 14.0 + Math.cos(t * 0.9) * 0.6;
+                fishRing.position.z = 14.0 + Math.sin(t * 0.9) * 0.6;
+            }
+        });
+
+        outdoorInteractables.push({
+            id: 'fishing_pier',
+            type: 'fish',
+            pos: new THREE.Vector3(12.2, 0.4, 12.2),
+            radius: 2.3,
+            label: 'Go Pond Fishing',
+            sub: 'Costs 10 ⚡ • Catch river fish',
+            icon: '🎣'
+        });
+    }
+    buildPier();
+
+    // ----------------------------------------------------------------------------
+    // 4F. TREES & BERRY BUSHES
+    // ----------------------------------------------------------------------------
+    function createCozyTree(x, z, scale = 1, canHarvest = true) {
+        const tree = new THREE.Group();
+        tree.position.set(x, 0.4, z);
+        tree.scale.setScalar(scale);
+
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.38, 1.8, 8), mat(0x8D5B4C));
+        trunk.position.y = 0.9;
+        trunk.castShadow = true;
+        tree.add(trunk);
+
+        const foliageColors = [0x74C69D, 0x52B788, 0x95D5B2];
+        const puffs = [
+            [0, 2.3, 0, 1.25],
+            [-0.75, 1.9, 0.4, 0.85],
+            [0.75, 1.95, -0.3, 0.9],
+            [0, 2.9, 0.2, 0.8]
+        ];
+        puffs.forEach(([px, py, pz, r], idx) => {
+            const leaf = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 1), mat(foliageColors[idx % foliageColors.length]));
+            leaf.position.set(px, py, pz);
+            leaf.castShadow = true;
+            tree.add(leaf);
+        });
+
+        outdoorWorld.add(tree);
+        outdoorColliders.push({ x, z, r: 0.75 * scale });
+
+        if (canHarvest) {
+            const treeData = { mesh: tree, cooldown: 0 };
+            outdoorInteractables.push({
+                id: `tree_${x}_${z}`,
+                type: 'wood',
+                pos: new THREE.Vector3(x, 0.4, z),
+                radius: 2.0,
+                label: 'Gather Softwood',
+                sub: 'Costs 8 ⚡ • +1 Cozy Wood',
+                icon: '🪵',
+                data: treeData
+            });
+        }
+    }
+
+    createCozyTree(-13.5, -1.5, 1.1, true);
+    createCozyTree(-11.0, 9.2, 0.95, true);
+    createCozyTree(6.5, -10.5, 1.15, true);
+    createCozyTree(13.2, -6.5, 1.0, false);
+    createCozyTree(-3.2, -12.8, 1.05, false);
+
+    function createBerryBush(x, z) {
+        const bush = new THREE.Group();
+        bush.position.set(x, 0.4, z);
+
+        const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(0.85, 1), mat(0x52B788));
+        leaves.position.y = 0.65;
+        leaves.castShadow = true;
+        bush.add(leaves);
+
+        const berries = [];
+        const berryOffsets = [
+            [0.45, 0.8, 0.55], [-0.5, 0.75, 0.5], [0.1, 1.15, 0.4],
+            [0.55, 0.65, -0.4], [-0.45, 0.85, -0.45]
+        ];
+        berryOffsets.forEach(([bx, by, bz]) => {
+            const b = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), mat(0xFF4D6D));
+            b.position.set(bx, by, bz);
+            bush.add(b);
+            berries.push(b);
+        });
+
+        outdoorWorld.add(bush);
+        outdoorColliders.push({ x, z, r: 0.85 });
+
+        const bushData = { berries, hasBerries: true, regrowTimer: 0 };
+        outdoorInteractables.push({
+            id: `bush_${x}_${z}`,
+            type: 'berry',
+            pos: new THREE.Vector3(x, 0.4, z),
+            radius: 1.85,
+            label: 'Pick Wild Berries',
+            sub: 'Free! • +2 Sweet Berries',
+            icon: '🍓',
+            data: bushData
+        });
+    }
+
+    createBerryBush(6.2, -5.6);
+    createBerryBush(1.2, 9.6);
+    createBerryBush(-6.8, 9.8);
+
+    // ----------------------------------------------------------------------------
+    // 4G. CUTE ANIMAL VILLAGERS (BARNABY, PIP THE BUNNY, CLOVER THE FOX, MOCHI THE CAT)
+    // ----------------------------------------------------------------------------
+    function createAnimalVillager(config) {
+        const {
+            id, x, z, rotY = 0,
+            furColor, muzzleColor, shirtColor,
+            earType = 'bear', // 'bear' | 'bunny' | 'fox' | 'cat'
+            hasBakerHat = false,
+            hasTail = false,
+            bobPhase = 0
+        } = config;
+
+        const npc = new THREE.Group();
+        npc.position.set(x, 0.4, z);
+        npc.rotation.y = rotY;
+
+        // Cozy Tunic / Sweater
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 0.88, 12), mat(shirtColor));
+        body.position.y = 0.54;
+        body.castShadow = true;
+        npc.add(body);
+
+        // Head
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.46, 14, 14), mat(furColor));
+        head.position.y = 1.26;
+        head.castShadow = true;
+        npc.add(head);
+
+        // Muzzle & Nose
+        const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.19, 10, 10), mat(muzzleColor));
+        muzzle.position.set(0, 1.18, 0.4);
+        npc.add(muzzle);
+
+        const nose = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), mat(earType === 'bunny' ? 0xFF8FAB : 0x4A352F));
+        nose.position.set(0, 1.23, 0.57);
+        npc.add(nose);
+
+        // Species-Specific Ears
+        if (earType === 'bear') {
+            [-0.33, 0.33].forEach(ex => {
+                const ear = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 10), mat(furColor));
+                ear.position.set(ex, 1.64, 0.05);
+                npc.add(ear);
+            });
+        } else if (earType === 'bunny') {
+            [-0.18, 0.18].forEach((ex, i) => {
+                const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.65, 10), mat(furColor));
+                ear.position.set(ex, 1.88, 0);
+                ear.rotation.z = i === 0 ? 0.12 : -0.12;
+                ear.castShadow = true;
+                npc.add(ear);
+            });
+        } else if (earType === 'fox' || earType === 'cat') {
+            [-0.25, 0.25].forEach((ex, i) => {
+                const ear = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.38, 4), mat(furColor));
+                ear.position.set(ex, 1.68, 0.04);
+                ear.rotation.z = i === 0 ? 0.18 : -0.18;
+                npc.add(ear);
+            });
+        }
+
+        // Cute Tail
+        if (hasTail) {
+            const tail = new THREE.Mesh(
+                earType === 'bunny' ? new THREE.SphereGeometry(0.18, 8, 8) : new THREE.ConeGeometry(0.18, 0.65, 8),
+                mat(earType === 'fox' ? 0xFFF9F0 : furColor)
+            );
+            tail.position.set(0, 0.45, -0.52);
+            if (earType !== 'bunny') tail.rotation.x = -0.8;
+            npc.add(tail);
+        }
+
+        // Optional Chef/Baker Hat for Pip
+        if (hasBakerHat) {
+            const puff = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 10), mat(0xFFFFFF));
+            puff.position.set(0, 1.76, 0.06);
+            npc.add(puff);
+        }
+
+        // Cute Eyes & Rosy Cheeks
+        [-0.16, 0.16].forEach(ex => {
+            const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), mat(0x2B1D19));
+            eye.position.set(ex, 1.32, 0.41);
+            npc.add(eye);
+        });
+
+        outdoorWorld.add(npc);
+        outdoorColliders.push({ x, z, r: 0.72 });
+
+        animatedProps.push({
+            mesh: npc,
+            update: (t) => {
+                npc.position.y = 0.4 + Math.abs(Math.sin(t * 2.5 + bobPhase)) * 0.07;
+                npc.rotation.z = Math.sin(t * 2.1 + bobPhase) * 0.045;
+            }
+        });
+
+        const npcData = gameState.npcs[id];
+        outdoorInteractables.push({
+            id: `villager_${id}`,
+            type: 'talk',
+            npcId: id,
+            pos: new THREE.Vector3(x, 0.4, z),
+            radius: 2.2,
+            label: `Chat with ${npcData.name}`,
+            sub: `${npcData.role} • Loves ${npcData.favLabel}`,
+            icon: npcData.avatar
+        });
+    }
+
+    // 1. Barnaby the Bear (Near Pier & Boathouse)
+    createAnimalVillager({
+        id: 'barnaby', x: 7.4, z: 7.4, rotY: -0.7,
+        furColor: 0xB07D62, muzzleColor: 0xF3D5B5, shirtColor: 0xFFB703,
+        earType: 'bear', bobPhase: 0
+    });
+
+    // 2. Pip the Bunny (Outside Mint Bakery)
+    createAnimalVillager({
+        id: 'pip', x: 7.2, z: -1.4, rotY: -1.4,
+        furColor: 0xFFF9F0, muzzleColor: 0xFFE5EC, shirtColor: 0xFF8FAB,
+        earType: 'bunny', hasBakerHat: true, hasTail: true, bobPhase: 1.4
+    });
+
+    // 3. Clover the Fox (Near Lavender Cabin & Garden)
+    createAnimalVillager({
+        id: 'clover', x: -7.5, z: 2.1, rotY: 1.4,
+        furColor: 0xF48C06, muzzleColor: 0xFFF9F0, shirtColor: 0x9D4EDD,
+        earType: 'fox', hasTail: true, bobPhase: 2.7
+    });
+
+    // 4. Mochi the Cat (Central Village Plaza)
+    createAnimalVillager({
+        id: 'mochi', x: 0.6, z: 1.4, rotY: -0.3,
+        furColor: 0xE5D4C0, muzzleColor: 0xFFF9F0, shirtColor: 0x80ED99,
+        earType: 'cat', hasTail: true, bobPhase: 4.1
+    });
+
+    // ----------------------------------------------------------------------------
+    // 4H. OUTDOOR CRAFTABLE DECORATION MESHES
+    // ----------------------------------------------------------------------------
+    function initOutdoorDecorMeshes() {
+        const lantern = new THREE.Group();
+        lantern.position.set(-4.0, 0.4, -2.0);
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.11, 2.1, 8), mat(0x6F4538));
+        post.position.y = 1.05;
+        post.castShadow = true;
+        lantern.add(post);
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 10), mat(0xFFE169, 0.2, 0xFFBE0B, 0.9));
+        bulb.position.set(0.32, 1.85, 0);
+        lantern.add(bulb);
+        const pointLight = new THREE.PointLight(0xFFD166, 1.1, 8);
+        pointLight.position.set(0.32, 1.85, 0);
+        lantern.add(pointLight);
+        lantern.visible = false;
+        outdoorWorld.add(lantern);
+        decorMeshes['lantern_post'] = lantern;
+
+        const picnic = new THREE.Group();
+        picnic.position.set(-1.5, 0.41, 4.6);
+        const blanket = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.04, 2.0), mat(0xFFCAD4));
+        blanket.receiveShadow = true;
+        picnic.add(blanket);
+        const basket = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.35, 0.4), mat(0xC68B59));
+        basket.position.set(-0.55, 0.2, -0.4);
+        picnic.add(basket);
+        picnic.visible = false;
+        outdoorWorld.add(picnic);
+        decorMeshes['picnic_blanket'] = picnic;
+
+        const arch = new THREE.Group();
+        arch.position.set(1.1, 0.4, -4.4);
+        [-1.1, 1.1].forEach(ax => {
+            const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 2.3, 8), mat(0xFFF6E9));
+            pillar.position.set(ax, 1.15, 0);
+            arch.add(pillar);
+        });
+        const topBeam = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.18, 0.25), mat(0xFFF6E9));
+        topBeam.position.set(0, 2.3, 0);
+        arch.add(topBeam);
+        for (let i = -4; i <= 4; i++) {
+            const bloom = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24, 0), mat(i % 2 === 0 ? 0xFF8FAB : 0xFFC2D1));
+            bloom.position.set(i * 0.28, 2.42 + Math.cos(i) * 0.08, 0);
+            arch.add(bloom);
+        }
+        arch.visible = false;
+        outdoorWorld.add(arch);
+        decorMeshes['flower_arch'] = arch;
+    }
+    initOutdoorDecorMeshes();
+
+    // ----------------------------------------------------------------------------
+    // 5. PLAYER CHARACTER & SCENE TRANSITION (ENTER/EXIT HOUSE)
+    // ----------------------------------------------------------------------------
+    const player = new THREE.Group();
+    player.position.set(-2.5, 0.4, 0.5);
+
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 0.78, 12), mat(0x6D9DC5));
+    torso.position.y = 0.58;
+    torso.castShadow = true;
+    player.add(torso);
+
+    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.48, 0.26), mat(0xE07A5F));
+    pack.position.set(0, 0.62, -0.32);
+    pack.castShadow = true;
+    player.add(pack);
+
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 14, 14), mat(0xFFE0BD));
+    head.position.y = 1.22;
+    head.castShadow = true;
+    player.add(head);
+
+    [-0.14, 0.14].forEach(ex => {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), mat(0x3D2C2E));
+        eye.position.set(ex, 1.24, 0.34);
+        player.add(eye);
+
+        const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), mat(0xFF9AA2));
+        cheek.position.set(ex * 1.45, 1.16, 0.31);
+        player.add(cheek);
+    });
+
+    const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.06, 16), mat(0xFCD581));
+    hatBrim.position.y = 1.48;
+    hatBrim.castShadow = true;
+    player.add(hatBrim);
+
+    const hatCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.26, 14), mat(0xFCD581));
+    hatCrown.position.y = 1.62;
+    player.add(hatCrown);
+
+    const hatRibbon = new THREE.Mesh(new THREE.CylinderGeometry(0.365, 0.365, 0.07, 14), mat(0xE07A5F));
+    hatRibbon.position.y = 1.52;
+    player.add(hatRibbon);
+
+    const footL = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), mat(0x6F4538));
+    footL.position.set(-0.16, 0.14, 0.05);
+    player.add(footL);
+    const footR = footL.clone();
+    footR.position.set(0.16, 0.14, 0.05);
+    player.add(footR);
+
+    scene.add(player);
+
+    const targetRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.65, 0.82, 24),
+        new THREE.MeshBasicMaterial({ color: 0xFFE169, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+    );
+    targetRing.rotation.x = -Math.PI / 2;
+    targetRing.position.y = 0.44;
+    targetRing.visible = false;
+    scene.add(targetRing);
+
+    function switchZone(targetZone) {
+        const curtain = document.getElementById('scene-curtain');
+        curtain.classList.remove('opacity-0');
+        curtain.classList.add('opacity-100');
+        audio.playDoor();
+
+        setTimeout(() => {
+            gameState.zone = targetZone;
+            if (targetZone === 'cottage') {
+                gameState.savedOutdoorPos = { x: player.position.x, z: player.position.z };
+                outdoorWorld.visible = false;
+                cottageInteriorWorld.visible = true;
+                player.position.set(0, 0, 2.7);
+                player.rotation.y = Math.PI;
+                cameraAngle = 0;
+                cameraPitch = 0.68;
+                cameraDist = 11.5;
+                document.getElementById('location-badge').innerHTML = `<span>🏡</span><span>Your Cozy Cottage</span>`;
+                advanceQuest('enter_house', 1);
+                showToast('Welcome home! Warm up by the hearth fire.', '🏡');
+            } else {
+                cottageInteriorWorld.visible = false;
+                outdoorWorld.visible = true;
+                player.position.set(gameState.savedOutdoorPos.x, 0.4, gameState.savedOutdoorPos.z);
+                cameraAngle = Math.PI * 0.25;
+                cameraPitch = 0.62;
+                cameraDist = 16.0;
+                document.getElementById('location-badge').innerHTML = `<span>🏝️</span><span>Sunbeam Village</span>`;
+                showToast('Stepped outside into Sunbeam Village!', '🌻');
+            }
+
+            setTimeout(() => {
+                curtain.classList.remove('opacity-100');
+                curtain.classList.add('opacity-0');
+            }, 140);
+        }, 240);
+    }
+
+    // ----------------------------------------------------------------------------
+    // 6. INPUT HANDLING
+    // ----------------------------------------------------------------------------
+    const keys = {};
+    const joyVec = { x: 0, y: 0 };
+    let activeInteractable = null;
+
+    window.addEventListener('keydown', (e) => {
+        keys[e.code] = true;
+        if (!gameState.started) return;
+
+        if (e.code === 'KeyE' || e.code === 'Space') {
+            if (gameState.fishing.active) {
+                attemptReelFish();
+            } else if (!isModalOpen() && activeInteractable) {
+                triggerInteraction(activeInteractable);
+            }
+        }
+        if (e.code === 'Escape') {
+            closeAllModals();
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        keys[e.code] = false;
+    });
+
+    let isDraggingCam = false;
+    let prevMouseX = 0;
+    let prevMouseY = 0;
+
+    canvas.addEventListener('mousedown', (e) => {
+        isDraggingCam = true;
+        prevMouseX = e.clientX;
+        prevMouseY = e.clientY;
+    });
+    window.addEventListener('mouseup', () => { isDraggingCam = false; });
+    window.addEventListener('mousemove', (e) => {
+        if (!isDraggingCam) return;
+        const dx = e.clientX - prevMouseX;
+        const dy = e.clientY - prevMouseY;
+        prevMouseX = e.clientX;
+        prevMouseY = e.clientY;
+        cameraAngle -= dx * 0.007;
+        cameraPitch = Math.max(0.32, Math.min(1.15, cameraPitch + dy * 0.005));
+    });
+
+    const joyZone = document.getElementById('joystick-zone');
+    const joyKnob = document.getElementById('joystick-knob');
+    let joyTouchId = null;
+
+    joyZone.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const t = e.changedTouches[0];
+        joyTouchId = t.identifier;
+        updateJoystick(t.clientX, t.clientY);
+    }, { passive: false });
+
+    joyZone.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === joyTouchId) {
+                updateJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+            }
+        }
+    }, { passive: false });
+
+    const resetJoystick = () => {
+        joyTouchId = null;
+        joyVec.x = 0;
+        joyVec.y = 0;
+        joyKnob.style.transform = 'translate(0px, 0px)';
+    };
+    joyZone.addEventListener('touchend', resetJoystick);
+    joyZone.addEventListener('touchcancel', resetJoystick);
+
+    function updateJoystick(clientX, clientY) {
+        const rect = joyZone.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const maxR = rect.width * 0.36;
+        let dx = clientX - cx;
+        let dy = clientY - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > maxR) {
+            dx = (dx / dist) * maxR;
+            dy = (dy / dist) * maxR;
+        }
+        joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        joyVec.x = dx / maxR;
+        joyVec.y = dy / maxR;
+    }
+
+    // ----------------------------------------------------------------------------
+    // 7. UI & NOTIFICATION HELPERS
+    // ----------------------------------------------------------------------------
+    function showToast(msg, icon = '✨') {
+        const container = document.getElementById('toast-container');
+        const el = document.createElement('div');
+        el.className = 'cozy-panel px-4 py-2 text-xs sm:text-sm font-extrabold text-[#5C3A2E] flex items-center gap-2 animate-pop shadow-lg';
+        el.innerHTML = `<span class="text-base">${icon}</span><span>${msg}</span>`;
+        container.appendChild(el);
+        setTimeout(() => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-8px)';
+            el.style.transition = 'all 0.25s ease';
+            setTimeout(() => el.remove(), 260);
+        }, 2400);
+    }
+
+    function isModalOpen() {
+        return !document.getElementById('dialogue-modal').classList.contains('hidden') ||
+               !document.getElementById('decor-modal').classList.contains('hidden') ||
+               !document.getElementById('neighbors-modal').classList.contains('hidden') ||
+               !document.getElementById('kitchen-modal').classList.contains('hidden') ||
+               gameState.fishing.active;
+    }
+
+    function closeAllModals() {
+        ['dialogue-modal', 'decor-modal', 'neighbors-modal', 'kitchen-modal'].forEach(id => {
+            const el = document.getElementById(id);
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+        });
+    }
+
+    function spendEnergy(amount) {
+        if (gameState.energy < amount) {
+            showToast('Too sleepy! Eat a berry 🍓, drink tea 🍵, or nap in bed 🛌', '💤');
+            return false;
+        }
+        gameState.energy = Math.max(0, gameState.energy - amount);
+        updateHUD();
+        return true;
+    }
+
+    function advanceQuest(questId, amount = 1) {
+        const q = gameState.quests.find(item => item.id === questId);
+        if (!q || q.done) return;
+        q.current = Math.min(q.target, q.current + amount);
+        if (q.current >= q.target) {
+            q.done = true;
+            gameState.cozyScore += 20;
+            audio.playChime();
+            showToast(`Wish Fulfilled: ${q.text}! (+20 💖)`, '🎉');
+        }
+        updateHUD();
+    }
+
+    function updateHUD() {
+        document.getElementById('energy-label').textContent = `${Math.round(gameState.energy)} / ${gameState.maxEnergy}`;
+        document.getElementById('energy-bar').style.width = `${(gameState.energy / gameState.maxEnergy) * 100}%`;
+
+        const cozyLevel = Math.floor(gameState.cozyScore / 50) + 1;
+        const cozyPct = Math.min(100, (gameState.cozyScore % 50) * 2);
+        document.getElementById('cozy-label').textContent = `Lv. ${cozyLevel} (${gameState.cozyScore} pts)`;
+        document.getElementById('cozy-bar').style.width = `${cozyPct}%`;
+
+        const slotDefs = [
+            { key: 'berries', icon: '🍓', name: 'Berries' },
+            { key: 'wood', icon: '🪵', name: 'Wood' },
+            { key: 'flowers', icon: '🌸', name: 'Flowers' },
+            { key: 'fish', icon: '🐟', name: 'Fish' },
+            { key: 'tea', icon: '🍵', name: 'Berry Tea' }
+        ];
+        const invContainer = document.getElementById('inventory-slots');
+        invContainer.innerHTML = slotDefs.map(s => `
+            <div class="bg-[#F7EDE2] border-2 border-[#E6CCB2] rounded-xl px-2 py-1 flex flex-col items-center min-w-[44px] sm:min-w-[52px]" title="${s.name}">
+                <span class="text-base sm:text-lg leading-none">${s.icon}</span>
+                <span class="text-xs font-extrabold text-[#5C3A2E] mt-0.5">${gameState.inventory[s.key]}</span>
+            </div>
+        `).join('');
+
+        const doneCount = gameState.quests.filter(q => q.done).length;
+        document.getElementById('quest-progress-badge').textContent = `${doneCount}/${gameState.quests.length}`;
+        document.getElementById('quest-list').innerHTML = gameState.quests.map(q => `
+            <li class="flex items-start gap-1.5 ${q.done ? 'line-through opacity-60 text-emerald-800' : ''}">
+                <span>${q.done ? '✅' : '🔸'}</span>
+                <span>${q.text} (${q.current}/${q.target})</span>
+            </li>
+        `).join('');
+
+        // Update active NPC dialogue gift counters & hearts
+        const npc = gameState.npcs[gameState.activeNpcId];
+        if (npc) {
+            document.getElementById('gift-berries-count').textContent = gameState.inventory.berries;
+            document.getElementById('gift-flowers-count').textContent = gameState.inventory.flowers;
+            document.getElementById('gift-fish-count').textContent = gameState.inventory.fish;
+            document.getElementById('gift-tea-count').textContent = gameState.inventory.tea;
+            document.getElementById('friendship-hearts').textContent =
+                '❤️'.repeat(npc.friendship) + '🤍'.repeat(5 - npc.friendship);
+        }
+    }
+
+    // ----------------------------------------------------------------------------
+    // 8. INTERACTION HANDLERS (HOUSES, GARDEN, FISHING, VILLAGERS, KITCHEN, DECOR)
+    // ----------------------------------------------------------------------------
+    function triggerInteraction(item) {
+        if (!item) return;
+
+        if (item.type === 'enter_house') {
+            switchZone('cottage');
+        }
+        else if (item.type === 'exit_house') {
+            switchZone('outdoor');
+        }
+        else if (item.type === 'inspect') {
+            audio.playPop();
+            showToast(item.msg, item.icon);
+        }
+        else if (item.type === 'kitchen') {
+            audio.playPop();
+            document.getElementById('kitchen-modal').classList.remove('hidden');
+            document.getElementById('kitchen-modal').classList.add('flex');
+        }
+        else if (item.type === 'garden') {
+            const plot = item.data;
+            if (plot.stage === 0) {
+                if (!spendEnergy(5)) return;
+                plot.stage = 1;
+                plot.growTimer = 0;
+                plot.soilMat.color.setHex(0x5D4037);
+                plot.plantGroup.scale.setScalar(0.85);
+                audio.playWater();
+                showToast('Watered sprout! It will bloom soon.', '💧');
+            } else if (plot.stage === 1) {
+                showToast('Sprout is soaking up sunshine... almost blooming!', '🌱');
+                audio.playPop();
+            } else if (plot.stage === 2) {
+                plot.stage = 0;
+                plot.growTimer = 0;
+                plot.soilMat.color.setHex(0x8D6E63);
+                plot.plantGroup.scale.setScalar(0.55);
+                plot.blossomGroup.visible = false;
+                gameState.inventory.flowers += 1;
+                gameState.cozyScore += 5;
+                audio.playPop();
+                showToast('Harvested a fragrant wildflower! (+1 🌸)', '🌸');
+                advanceQuest('water_flowers', 1);
+                updateHUD();
+            }
+        }
+        else if (item.type === 'fish') {
+            if (!spendEnergy(10)) return;
+            startFishingMinigame();
+        }
+        else if (item.type === 'wood') {
+            const tree = item.data;
+            if (tree.cooldown > 0) {
+                showToast('This tree needs a little rest before gathering more wood.', '🌳');
+                return;
+            }
+            if (!spendEnergy(8)) return;
+            tree.cooldown = 18;
+            gameState.inventory.wood += 1;
+            audio.playChop();
+            showToast('Gathered fallen branches! (+1 🪵)', '🪵');
+            updateHUD();
+        }
+        else if (item.type === 'berry') {
+            const bush = item.data;
+            if (!bush.hasBerries) {
+                showToast('Berries are growing back! Check again soon.', '🌿');
+                return;
+            }
+            bush.hasBerries = false;
+            bush.regrowTimer = 20;
+            bush.berries.forEach(b => b.visible = false);
+            gameState.inventory.berries += 2;
+            audio.playPop();
+            showToast('Picked sweet wild berries! (+2 🍓)', '🍓');
+            updateHUD();
+        }
+        else if (item.type === 'talk') {
+            openVillagerDialogue(item.npcId);
+        }
+        else if (item.type === 'workbench') {
+            openDecorWorkshop();
+        }
+        else if (item.type === 'rest') {
+            gameState.energy = gameState.maxEnergy;
+            gameState.timeOfDay = (gameState.timeOfDay + 0.25) % 1;
+            if (gameState.timeOfDay < 0.25) gameState.day += 1;
+            audio.playChime();
+            showToast('Had a cozy nap! Energy fully restored ⚡', '🛌');
+            updateHUD();
+        }
+    }
+
+    // --- Fishing Mini-game ---
+    function startFishingMinigame() {
+        const f = gameState.fishing;
+        f.active = true;
+        f.progress = 0.08;
+        f.dir = 1;
+        f.targetStart = 0.45 + Math.random() * 0.25;
+        f.targetWidth = 0.28;
+        document.getElementById('fishing-zone').style.marginLeft = `${f.targetStart * 100}%`;
+        document.getElementById('fishing-zone').style.width = `${f.targetWidth * 100}%`;
+        document.getElementById('fishing-status').textContent = 'Tap Reel when the bobber hits green!';
+        document.getElementById('fishing-modal').classList.remove('hidden');
+        document.getElementById('fishing-modal').classList.add('flex');
+        audio.playSplash();
+    }
+
+    function attemptReelFish() {
+        const f = gameState.fishing;
+        if (!f.active) return;
+        f.active = false;
+        document.getElementById('fishing-modal').classList.add('hidden');
+        document.getElementById('fishing-modal').classList.remove('flex');
+
+        if (f.progress >= f.targetStart - 0.04 && f.progress <= f.targetStart + f.targetWidth + 0.04) {
+            gameState.inventory.fish += 1;
+            gameState.cozyScore += 10;
+            audio.playChime();
+            showToast('You caught a shimmering Sunfish! (+1 🐟)', '🎣');
+            advanceQuest('catch_fish', 1);
+        } else {
+            audio.playSplash();
+            showToast('The little fish slipped away! Try again.', '💦');
+        }
+        updateHUD();
+    }
+    document.getElementById('reel-btn').addEventListener('click', attemptReelFish);
+
+    // --- Multi-Villager Dialogue & Gifting ---
+    function openVillagerDialogue(npcId) {
+        gameState.activeNpcId = npcId;
+        const npc = gameState.npcs[npcId];
+        audio.playTalk(npc.pitch);
+        const line = npc.lines[Math.floor(Math.random() * npc.lines.length)];
+        document.getElementById('dialogue-avatar').textContent = npc.avatar;
+        document.getElementById('dialogue-name').textContent = npc.name;
+        document.getElementById('dialogue-role').textContent = npc.role;
+        document.getElementById('dialogue-fav').textContent = `Loves: ${npc.favLabel}`;
+        document.getElementById('dialogue-text').textContent = `"${line}"`;
+        updateHUD();
+        document.getElementById('dialogue-modal').classList.remove('hidden');
+        document.getElementById('dialogue-modal').classList.add('flex');
+    }
+
+    document.querySelectorAll('.gift-item-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const giftKey = btn.getAttribute('data-gift');
+            const npc = gameState.npcs[gameState.activeNpcId];
+            if (!npc) return;
+
+            if ((gameState.inventory[giftKey] || 0) <= 0) {
+                showToast(`You don't have any ${giftKey} to gift right now!`, '🎁');
+                return;
+            }
+
+            gameState.inventory[giftKey] -= 1;
+            const isFav = npc.favItem === giftKey;
+            const heartGain = isFav ? 2 : 1;
+            npc.friendship = Math.min(5, npc.friendship + heartGain);
+            gameState.cozyScore += isFav ? 18 : 10;
+            audio.playChime();
+
+            if (isFav) {
+                document.getElementById('dialogue-text').textContent =
+                    `"Gasps! ${npc.favLabel}?! That's my absolute favorite thing in Sunbeam Cove! Thank you so much, bestie!"`;
+                showToast(`${npc.name} LOVED your gift! (+${heartGain} ❤️)`, npc.avatar);
+            } else {
+                document.getElementById('dialogue-text').textContent =
+                    `"How thoughtful of you! I'll treasure this gift, neighbor!"`;
+                showToast(`Gifted to ${npc.name}! (+1 ❤️)`, npc.avatar);
+            }
+
+            advanceQuest('gift_neighbor', 1);
+            updateHUD();
+        });
+    });
+
+    document.getElementById('close-dialogue-btn').addEventListener('click', closeAllModals);
+
+    // --- Neighbors Directory Modal ---
+    function openNeighborsDirectory() {
+        const list = document.getElementById('neighbors-list');
+        list.innerHTML = Object.values(gameState.npcs).map(npc => `
+            <div class="bg-[#F7EDE2] border-2 border-[#E6CCB2] rounded-2xl p-3 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-xl bg-[#FFF9F0] border-2 border-[#D4A373] flex items-center justify-center text-2xl shrink-0">
+                        ${npc.avatar}
+                    </div>
+                    <div>
+                        <div class="font-cozy font-bold text-base text-[#5C3A2E]">${npc.name} <span class="text-xs font-normal text-[#8D6B5D]">• ${npc.role}</span></div>
+                        <div class="text-xs text-[#7F5548]">Home: ${npc.house} • Loves: ${npc.favLabel}</div>
+                        <div class="text-xs mt-0.5">${'❤️'.repeat(npc.friendship)}${'🤍'.repeat(5 - npc.friendship)}</div>
+                    </div>
+                </div>
+                <button data-chat-npc="${npc.id}" class="quick-chat-btn cozy-btn px-3 py-1.5 text-xs font-cozy font-bold bg-[#FCD581]">
+                    💬 Chat
+                </button>
+            </div>
+        `).join('');
+
+        document.querySelectorAll('.quick-chat-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-chat-npc');
+                closeAllModals();
+                openVillagerDialogue(id);
+            });
+        });
+
+        document.getElementById('neighbors-modal').classList.remove('hidden');
+        document.getElementById('neighbors-modal').classList.add('flex');
+    }
+
+    // --- Cottage Kitchen Cooking ---
+    document.getElementById('brew-tea-btn').addEventListener('click', () => {
+        if (gameState.inventory.berries < 2) {
+            showToast('Need 2 Wild Berries 🍓 to brew Berry Tea!', '🫖');
+            return;
+        }
+        gameState.inventory.berries -= 2;
+        gameState.inventory.tea += 1;
+        gameState.cozyScore += 8;
+        audio.playChime();
+        showToast('Brewed fragrant Berry Tea! (+1 🍵)', '🍵');
+        updateHUD();
+    });
+
+    document.getElementById('cook-broth-btn').addEventListener('click', () => {
+        if (gameState.inventory.flowers < 1 || gameState.inventory.fish < 1) {
+            showToast('Need 1 Flower 🌸 and 1 Fish 🐟!', '🍲');
+            return;
+        }
+        gameState.inventory.flowers -= 1;
+        gameState.inventory.fish -= 1;
+        gameState.energy = gameState.maxEnergy;
+        gameState.cozyScore += 15;
+        audio.playChime();
+        showToast('Simmered Honey Herb Broth! Energy 100% ⚡ & +15 💖', '🍲');
+        updateHUD();
+    });
+    document.getElementById('close-kitchen-btn').addEventListener('click', closeAllModals);
+
+    // --- Camp & Cottage Decorating Workshop ---
+    function openDecorWorkshop() {
+        renderDecorList();
+        document.getElementById('decor-modal').classList.remove('hidden');
+        document.getElementById('decor-modal').classList.add('flex');
+    }
+
+    function renderDecorList() {
+        const list = document.getElementById('decor-items-list');
+        list.innerHTML = gameState.decorCatalog.map(item => {
+            const costParts = Object.entries(item.cost).map(([k, v]) => {
+                const icon = k === 'wood' ? '🪵' : k === 'berries' ? '🍓' : k === 'flowers' ? '🌸' : '🐟';
+                const hasEnough = gameState.inventory[k] >= v;
+                return `<span class="${hasEnough ? 'text-emerald-800' : 'text-rose-700'} font-extrabold">${v} ${icon}</span>`;
+            }).join(' • ');
+
+            return `
+                <div class="bg-[#F7EDE2] border-2 border-[#E6CCB2] rounded-2xl p-3 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-xl bg-[#FFF9F0] border-2 border-[#D4A373] flex items-center justify-center text-2xl shrink-0">
+                            ${item.icon}
+                        </div>
+                        <div>
+                            <div class="font-cozy font-bold text-sm sm:text-base text-[#5C3A2E]">${item.name}</div>
+                            <div class="text-xs text-[#7F5548]">${item.desc}</div>
+                            <div class="text-xs mt-1">Cost: ${costParts} • <span class="text-pink-700 font-bold">+${item.cozyBonus} 💖</span></div>
+                        </div>
+                    </div>
+                    <button data-decor-id="${item.id}" class="craft-decor-btn cozy-btn px-3.5 py-2 text-xs font-cozy font-bold shrink-0 ${item.built ? 'opacity-60 cursor-default bg-emerald-100 border-emerald-400' : 'bg-[#FCD581]'}">
+                        ${item.built ? '✅ Placed' : '✨ Craft'}
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        document.querySelectorAll('.craft-decor-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-decor-id');
+                craftDecorItem(id);
+            });
+        });
+    }
+
+    function craftDecorItem(id) {
+        const item = gameState.decorCatalog.find(d => d.id === id);
+        if (!item || item.built) return;
+
+        for (const [res, amt] of Object.entries(item.cost)) {
+            if ((gameState.inventory[res] || 0) < amt) {
+                showToast(`Need more ${res} to craft ${item.name}!`, '🧺');
+                return;
+            }
+        }
+        for (const [res, amt] of Object.entries(item.cost)) {
+            gameState.inventory[res] -= amt;
+        }
+
+        item.built = true;
+        gameState.cozyScore += item.cozyBonus;
+        if (decorMeshes[id]) {
+            decorMeshes[id].visible = true;
+        }
+        if (interiorDecorMeshes[id]) {
+            interiorDecorMeshes[id].visible = true;
+        }
+
+        audio.playChime();
+        showToast(`Crafted & placed ${item.name}! (+${item.cozyBonus} 💖)`, item.icon);
+        advanceQuest('craft_decor', 1);
+        renderDecorList();
+        updateHUD();
+    }
+
+    // ----------------------------------------------------------------------------
+    // 9. HUD BUTTON BINDINGS
+    // ----------------------------------------------------------------------------
+    document.getElementById('start-btn').addEventListener('click', () => {
+        audio.init();
+        audio.playChime();
+        gameState.started = true;
+        document.getElementById('start-modal').classList.add('hidden');
+        document.getElementById('hud').classList.remove('hidden');
+        updateHUD();
+        showToast('Welcome to Sunbeam Village! Visit your neighbors or enter your cottage.', '🌻');
+    });
+
+    document.getElementById('sound-btn').addEventListener('click', (e) => {
+        audio.init();
+        const muted = audio.toggleMute();
+        e.currentTarget.textContent = muted ? '🔇' : '🔊';
+    });
+
+    document.getElementById('time-toggle-btn').addEventListener('click', () => {
+        gameState.timeOfDay = (gameState.timeOfDay + 0.22) % 1;
+        if (gameState.timeOfDay < 0.22) gameState.day += 1;
+        audio.playPop();
+    });
+
+    document.getElementById('snack-btn').addEventListener('click', () => {
+        if (gameState.energy >= gameState.maxEnergy) {
+            showToast('Your energy is already full!', '⚡');
+            return;
+        }
+        if (gameState.inventory.tea > 0) {
+            gameState.inventory.tea -= 1;
+            gameState.energy = Math.min(gameState.maxEnergy, gameState.energy + 50);
+            audio.playPop();
+            showToast('Sipped warm Berry Tea! +50 Energy ⚡', '🍵');
+            updateHUD();
+            return;
+        }
+        if (gameState.inventory.berries > 0) {
+            gameState.inventory.berries -= 1;
+            gameState.energy = Math.min(gameState.maxEnergy, gameState.energy + 25);
+            audio.playPop();
+            showToast('Ate a sweet berry! +25 Energy ⚡', '🍓');
+            updateHUD();
+            return;
+        }
+        showToast('Pick wild berries from bushes first!', '🍓');
+    });
+
+    document.getElementById('neighbors-open-btn').addEventListener('click', openNeighborsDirectory);
+    document.getElementById('close-neighbors-btn').addEventListener('click', closeAllModals);
+    document.getElementById('decor-open-btn').addEventListener('click', openDecorWorkshop);
+    document.getElementById('close-decor-btn').addEventListener('click', closeAllModals);
+
+    document.getElementById('action-prompt').addEventListener('click', () => {
+        if (activeInteractable && !isModalOpen()) {
+            triggerInteraction(activeInteractable);
+        }
+    });
+
+    // ----------------------------------------------------------------------------
+    // 10. DAY / GOLDEN-HOUR / COZY NIGHT LIGHTING CYCLE
+    // ----------------------------------------------------------------------------
+    const skyColors = {
+        morning: new THREE.Color(0xAEE2FF),
+        noon:    new THREE.Color(0x8ECAE6),
+        golden:  new THREE.Color(0xFFAF7A),
+        night:   new THREE.Color(0x2B3A67)
+    };
+    const sunColors = {
+        morning: new THREE.Color(0xFFF1D0),
+        noon:    new THREE.Color(0xFFFFFF),
+        golden:  new THREE.Color(0xFF9E5E),
+        night:   new THREE.Color(0x8FA8DA)
+    };
+
+    function updateDayNightCycle(dt) {
+        if (gameState.started && gameState.autoTime && !isModalOpen()) {
+            gameState.timeOfDay += dt * 0.0045;
+            if (gameState.timeOfDay >= 1) {
+                gameState.timeOfDay -= 1;
+                gameState.day += 1;
+            }
+        }
+
+        const t = gameState.timeOfDay;
+        let sky = new THREE.Color();
+        let sun = new THREE.Color();
+        let sunIntensity = 1.25;
+        let periodLabel = 'Morning';
+        let icon = '☀️';
+
+        if (t < 0.35) {
+            sky.lerpColors(skyColors.morning, skyColors.noon, t / 0.35);
+            sun.lerpColors(sunColors.morning, sunColors.noon, t / 0.35);
+            periodLabel = 'Morning';
+            icon = '🌤️';
+        } else if (t < 0.62) {
+            sky.lerpColors(skyColors.noon, skyColors.golden, (t - 0.35) / 0.27);
+            sun.lerpColors(sunColors.noon, sunColors.golden, (t - 0.35) / 0.27);
+            periodLabel = t > 0.52 ? 'Golden Hour' : 'Afternoon';
+            icon = t > 0.52 ? '🌇' : '☀️';
+        } else if (t < 0.82) {
+            sky.lerpColors(skyColors.golden, skyColors.night, (t - 0.62) / 0.20);
+            sun.lerpColors(sunColors.golden, sunColors.night, (t - 0.62) / 0.20);
+            sunIntensity = 0.65;
+            periodLabel = 'Starlight';
+            icon = '🌙';
+        } else {
+            sky.lerpColors(skyColors.night, skyColors.morning, (t - 0.82) / 0.18);
+            sun.lerpColors(sunColors.night, sunColors.morning, (t - 0.82) / 0.18);
+            sunIntensity = 0.85;
+            periodLabel = 'Dawn';
+            icon = '🌅';
+        }
+
+        if (gameState.zone === 'cottage') {
+            scene.background.setHex(0x3D2C2E);
+            scene.fog.color.setHex(0x3D2C2E);
+            sunLight.intensity = 0.7;
+        } else {
+            scene.background.copy(sky);
+            scene.fog.color.copy(sky);
+            sunLight.color.copy(sun);
+            sunLight.intensity = sunIntensity;
+        }
+
+        // Brighten street lamps at evening/night
+        const isEvening = t > 0.55 && t < 0.88;
+        streetLanternLights.forEach(l => { l.intensity = isEvening ? 1.25 : 0.25; });
+
+        const sunAngle = (t - 0.25) * Math.PI * 2;
+        sunLight.position.set(Math.cos(sunAngle) * 22, Math.max(6, Math.sin(sunAngle) * 24 + 10), 14);
+
+        const totalHours = Math.floor(t * 24);
+        const mins = Math.floor((t * 24 - totalHours) * 60);
+        const ampm = totalHours >= 12 ? 'PM' : 'AM';
+        const hr12 = totalHours % 12 === 0 ? 12 : totalHours % 12;
+        document.getElementById('clock-text').textContent = `${String(hr12).padStart(2, '0')}:${String(mins).padStart(2, '0')} ${ampm}`;
+        document.getElementById('day-text').textContent = `Day ${gameState.day} • ${periodLabel}`;
+        document.getElementById('time-icon').textContent = icon;
+    }
+
+    // ----------------------------------------------------------------------------
+    // 11. MAIN SIMULATION & ANIMATION LOOP
+    // ----------------------------------------------------------------------------
+    let clock = new THREE.Clock();
+    let stepTimer = 0;
+
+    function updateSimulation(dt, elapsed) {
+        updateDayNightCycle(dt);
+
+        animatedProps.forEach(p => p.update(elapsed, dt));
+        ocean.position.y = -0.56 + Math.sin(elapsed * 1.4) * 0.03;
+
+        gardenPlots.forEach(plot => {
+            if (plot.stage === 1) {
+                plot.growTimer += dt;
+                const progress = Math.min(1, plot.growTimer / 8.0);
+                plot.plantGroup.scale.setScalar(0.85 + progress * 0.35);
+                if (progress >= 1) {
+                    plot.stage = 2;
+                    plot.blossomGroup.visible = true;
+                }
+            }
+        });
+
+        outdoorInteractables.forEach(item => {
+            if (item.type === 'wood' && item.data.cooldown > 0) {
+                item.data.cooldown = Math.max(0, item.data.cooldown - dt);
+            }
+            if (item.type === 'berry' && !item.data.hasBerries) {
+                item.data.regrowTimer -= dt;
+                if (item.data.regrowTimer <= 0) {
+                    item.data.hasBerries = true;
+                    item.data.berries.forEach(b => b.visible = true);
+                }
+            }
+        });
+
+        if (gameState.fishing.active) {
+            const f = gameState.fishing;
+            f.progress += f.dir * dt * 0.85;
+            if (f.progress >= 0.94) { f.progress = 0.94; f.dir = -1; }
+            if (f.progress <= 0.04) { f.progress = 0.04; f.dir = 1; }
+            document.getElementById('fishing-bobber').style.left = `${f.progress * 100}%`;
+        }
+
+        if (keys['KeyQ']) cameraAngle += dt * 1.6;
+        if (keys['KeyE'] && !activeInteractable) cameraAngle -= dt * 1.6;
+
+        let moveX = 0;
+        let moveZ = 0;
+        if (gameState.started && !isModalOpen()) {
+            if (keys['KeyW'] || keys['ArrowUp']) moveZ -= 1;
+            if (keys['KeyS'] || keys['ArrowDown']) moveZ += 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
+            if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
+
+            if (Math.abs(joyVec.x) > 0.05 || Math.abs(joyVec.y) > 0.05) {
+                moveX += joyVec.x;
+                moveZ += joyVec.y;
+            }
+        }
+
+        const isIndoor = gameState.zone === 'cottage';
+        const baseGroundY = isIndoor ? 0.0 : 0.4;
+        const activeColliders = isIndoor ? cottageColliders : outdoorColliders;
+        const activeList = isIndoor ? cottageInteractables : outdoorInteractables;
+
+        const mag = Math.hypot(moveX, moveZ);
+        if (mag > 0.01) {
+            moveX /= Math.max(1, mag);
+            moveZ /= Math.max(1, mag);
+
+            const sin = Math.sin(cameraAngle);
+            const cos = Math.cos(cameraAngle);
+            const worldVX = moveX * cos + moveZ * sin;
+            const worldVZ = -moveX * sin + moveZ * cos;
+
+            const speed = isIndoor ? 4.4 : 5.6;
+            let nextX = player.position.x + worldVX * speed * dt;
+            let nextZ = player.position.z + worldVZ * speed * dt;
+
+            if (isIndoor) {
+                // Keep inside cottage interior room bounds
+                nextX = Math.max(-4.5, Math.min(4.5, nextX));
+                nextZ = Math.max(-3.7, Math.min(3.9, nextZ));
+            } else {
+                // Keep inside expanded island boundary (r <= 17.8)
+                const distFromCenter = Math.hypot(nextX, nextZ);
+                if (distFromCenter > 17.8) {
+                    nextX = (nextX / distFromCenter) * 17.8;
+                    nextZ = (nextZ / distFromCenter) * 17.8;
+                }
+            }
+
+            for (const c of activeColliders) {
+                const dx = nextX - c.x;
+                const dz = nextZ - c.z;
+                const d = Math.hypot(dx, dz);
+                const minDist = c.r + 0.42;
+                if (d < minDist && d > 0.001) {
+                    nextX = c.x + (dx / d) * minDist;
+                    nextZ = c.z + (dz / d) * minDist;
+                }
+            }
+
+            player.position.x = nextX;
+            player.position.z = nextZ;
+
+            const targetRot = Math.atan2(worldVX, worldVZ);
+            let diff = targetRot - player.rotation.y;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            player.rotation.y += diff * Math.min(1, dt * 14);
+
+            player.position.y = baseGroundY + Math.abs(Math.sin(elapsed * 14)) * 0.11;
+            footL.position.z = Math.sin(elapsed * 14) * 0.14;
+            footR.position.z = -Math.sin(elapsed * 14) * 0.14;
+
+            stepTimer += dt;
+            if (stepTimer > 0.32) {
+                stepTimer = 0;
+                audio.playStep();
+            }
+        } else {
+            player.position.y = baseGroundY;
+            footL.position.z = 0;
+            footR.position.z = 0;
+        }
+
+        let nearest = null;
+        let bestDist = Infinity;
+        for (const item of activeList) {
+            const d = player.position.distanceTo(item.pos);
+            if (d <= item.radius && d < bestDist) {
+                bestDist = d;
+                nearest = item;
+            }
+        }
+
+        activeInteractable = nearest;
+        const promptEl = document.getElementById('action-prompt');
+        if (nearest && gameState.started && !isModalOpen()) {
+            if (nearest.type === 'garden') {
+                const st = nearest.data.stage;
+                if (st === 0) {
+                    nearest.icon = '💧';
+                    nearest.label = 'Water Flower Sprout';
+                    nearest.sub = 'Costs 5 ⚡ • Grows cozy blossoms';
+                } else if (st === 1) {
+                    nearest.icon = '🌱';
+                    nearest.label = 'Sprout Growing...';
+                    nearest.sub = 'Blooming in a few seconds!';
+                } else {
+                    nearest.icon = '🌸';
+                    nearest.label = 'Harvest Wildflower';
+                    nearest.sub = 'Free! • +1 🌸 Flower';
+                }
+            }
+
+            document.getElementById('prompt-icon').textContent = nearest.icon;
+            document.getElementById('prompt-title').textContent = nearest.label;
+            document.getElementById('prompt-sub').textContent = nearest.sub;
+            promptEl.classList.remove('hidden');
+
+            targetRing.visible = true;
+            targetRing.position.set(nearest.pos.x, baseGroundY + 0.04, nearest.pos.z);
+            targetRing.scale.setScalar(1 + Math.sin(elapsed * 5) * 0.08);
+        } else {
+            promptEl.classList.add('hidden');
+            targetRing.visible = false;
+        }
+
+        const camOffsetX = Math.sin(cameraAngle) * Math.cos(cameraPitch) * cameraDist;
+        const camOffsetY = Math.sin(cameraPitch) * cameraDist;
+        const camOffsetZ = Math.cos(cameraAngle) * Math.cos(cameraPitch) * cameraDist;
+
+        const desiredCamPos = new THREE.Vector3(
+            player.position.x + camOffsetX,
+            player.position.y + camOffsetY,
+            player.position.z + camOffsetZ
+        );
+        camera.position.lerp(desiredCamPos, Math.min(1, dt * 7));
+        camera.lookAt(player.position.x, player.position.y + 0.85, player.position.z);
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.05);
+        const elapsed = clock.elapsedTime;
+        updateSimulation(dt, elapsed);
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    window.onload = () => {
+        updateHUD();
+        animate();
+    };
+    </script>
+</body>
+</html>
